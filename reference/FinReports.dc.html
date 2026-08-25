@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f5ead8; }
+  body { font-family: Figtree, Assistant, system-ui, sans-serif; color: #201e1d; font-size: 19px; }
+  * { box-sizing: border-box; }
+  input, select, button, textarea { font-family: inherit; color: inherit; }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #c67139; outline-offset: 2px; }
+  a { color: #8c491a; text-decoration: none; }
+  a:hover { color: #643312; }
+  ::selection { background: #ffe1d0; }
+  input::placeholder, textarea::placeholder { color: #82796a; }
+  .hc [style*="color:#645c50"] { color: #33302a !important; }
+  .hc [style*="color:#474238"] { color: #201e1d !important; }
+  .hc [style*="color:#82796a"] { color: #3d3a33 !important; }
+  .hc [style*="solid #dcd3c4"] { border-color: #7a7263 !important; }
+  .hc [style*="solid #eee7db"] { border-color: #b3a894 !important; }
+  .hc [style*="solid #f2ece0"] { border-color: #b3a894 !important; }
+  .hc [style*="solid #c0b6a5"] { border-color: #4a453b !important; }
+  @media print {
+    @page { size: A4 portrait; margin: 12mm; }
+    html, body { background: #fff !important; }
+    .no-print { display: none !important; }
+    .app { zoom: 1 !important; }
+    main { padding: 0 !important; }
+    .print-sheet { box-shadow: none !important; border-radius: 0 !important; width: 100% !important; min-height: 0 !important; padding: 0 !important; break-after: page; page-break-after: always; break-inside: avoid; page-break-inside: avoid; }
+    .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+    .print-sheet table { width: 100% !important; }
+    .print-sheet thead { display: table-header-group; }
+    .print-sheet tr { break-inside: avoid; page-break-inside: avoid; }
+    .print-sheet td, .print-sheet th { padding: 3.2px 7px !important; font-size: 10.5pt !important; }
+  }
+</style>
+</helmet>
+
+<div class="app {{ hcClass }}" ref="{{ rootRef }}" dir="rtl" style="min-height:100vh;background:#f5ead8;color:#201e1d;font-family:Figtree,Assistant,system-ui,sans-serif;font-size:19px;display:flex;flex-direction:column">
+
+  <header class="no-print" style="padding:26px 44px 0 44px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:26px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:18px">
+        <div style="width:58px;height:58px;border-radius:999px;background:#c67139;color:#fffdf8;display:flex;align-items:center;justify-content:center;font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px">מא</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:27px;letter-spacing:-0.3px">עריכת דוחות כספיים</div>
+          <div style="font-size:18px;color:#645c50;font-weight:500">מסעוד אסעד · יועץ מס מוסמך</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:3px;text-align:left">
+          <div style="font-size:16px;color:#645c50;font-weight:600">הלקוח הפעיל</div>
+          <div style="font-size:20px;font-weight:700">{{ clientName }} · ח.פ {{ clientId }}</div>
+        </div>
+        <button onClick="{{ goClients }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:13px 24px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">החלפת לקוח</button>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="7">
+        <button onClick="{{ tab.go }}" style="{{ tab.style }}" style-hover="filter:brightness(0.97)">{{ tab.label }}</button>
+      </sc-for>
+    </div>
+  </header>
+
+  <div class="no-print" style="margin:20px 44px 0 44px;background:#ebddc5;border-radius:28px;padding:18px 26px;display:flex;align-items:center;gap:26px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:17px;font-weight:700;color:#645c50">תקופת הדוח</span>
+      <select value="{{ fromM }}" onChange="{{ setFrom }}" style="font-size:19px;font-weight:600;padding:11px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+        <sc-for list="{{ months }}" as="m" hint-placeholder-count="12"><option value="{{ m.v }}">{{ m.label }}</option></sc-for>
+      </select>
+      <span style="font-size:18px;color:#645c50;font-weight:600">עד</span>
+      <select value="{{ toM }}" onChange="{{ setTo }}" style="font-size:19px;font-weight:600;padding:11px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+        <sc-for list="{{ months }}" as="m" hint-placeholder-count="12"><option value="{{ m.v }}">{{ m.label }}</option></sc-for>
+      </select>
+      <select value="{{ year }}" onChange="{{ setYear }}" style="font-size:19px;font-weight:600;padding:11px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+        <sc-for list="{{ years }}" as="y" hint-placeholder-count="3"><option value="{{ y }}">{{ y }}</option></sc-for>
+      </select>
+      <span style="{{ prevBadgeStyle }}">{{ prevBadgeText }}</span>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-right:auto;flex-wrap:wrap">
+      <select value="{{ unit }}" onChange="{{ setUnit }}" style="font-size:18px;font-weight:600;padding:11px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+        <option value="ones">בשקלים שלמים</option>
+        <option value="agorot">שקלים ואגורות</option>
+        <option value="thousands">באלפי שקלים</option>
+      </select>
+      <button onClick="{{ togglePrev }}" style="{{ prevBtnStyle }}">תקופה מקבילה</button>
+      <button onClick="{{ toggleChange }}" style="{{ changeBtnStyle }}">עמודת שינוי</button>
+      <button onClick="{{ toggleHc }}" style="{{ hcBtnStyle }}">ניגודיות גבוהה</button>
+      <div style="display:flex;gap:6px">
+        <sc-for list="{{ zoomOpts }}" as="z" hint-placeholder-count="3">
+          <button onClick="{{ z.go }}" style="{{ z.style }}">{{ z.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <main style="flex:1;padding:24px 44px 60px 44px">
+
+    <!-- רשימת לקוחות -->
+    <sc-if value="{{ isClients }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:1500px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:24px">
+          <div>
+            <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:30px">רשימת לקוחות</div>
+            <div style="font-size:18px;color:#645c50;margin-top:6px">בחר תיק כדי לטעון את מאזן הבוחן, הביאורים והתבנית השמורה שלו.</div>
+          </div>
+          <button style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:15px 28px;font-size:19px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">+ לקוח חדש</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:22px">
+          <sc-for list="{{ clients }}" as="c" hint-placeholder-count="6">
+            <div style="{{ c.style }}">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+                <div style="font-size:22px;font-weight:700;line-height:1.3">{{ c.name }}</div>
+                <span style="{{ c.tagStyle }}">{{ c.status }}</span>
+              </div>
+              <div style="font-size:17px;color:#645c50;font-weight:500;margin-top:8px">ח.פ / ע.מ {{ c.id }} · {{ c.kind }}</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px">
+                <div style="font-size:17px;color:#645c50">דוח אחרון: <b style="color:#201e1d">{{ c.last }}</b></div>
+                <button onClick="{{ c.open }}" style="background:#fffdf8;color:#8c491a;border:2px solid #c67139;border-radius:999px;padding:11px 22px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0">פתח תיק</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- קליטת קבצים -->
+    <sc-if value="{{ isFiles }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:1500px;align-items:start">
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px">קליטת קבצים במבנה אחיד</div>
+          <div style="font-size:18px;color:#645c50;margin:10px 0 26px 0;line-height:1.65">גרור לכאן את שני הקבצים מתיקיית הפתיחה. המערכת מזהה את סוגי הרשומות, בונה את מאזן הבוחן ומחלצת את התנועות לכל כרטיס.</div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="border:2.5px dashed #c0b6a5;border-radius:28px;padding:26px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#f9f4ed">
+              <div>
+                <div style="font-size:21px;font-weight:700">INI.TXT</div>
+                <div style="font-size:17px;color:#645c50;margin-top:4px">רשומות סיכום ומספרי רשומות</div>
+              </div>
+              <span style="font-size:17px;font-weight:700;color:#56633f;background:#f0fae1;border:2px solid #ccdbb2;border-radius:999px;padding:9px 18px">נטען · 1.2KB</span>
+            </div>
+            <div style="border:2.5px dashed #c0b6a5;border-radius:28px;padding:26px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#f9f4ed">
+              <div>
+                <div style="font-size:21px;font-weight:700">BKMVDATA.TXT</div>
+                <div style="font-size:17px;color:#645c50;margin-top:4px">חשבונות ותנועות הנהלת חשבונות</div>
+              </div>
+              <span style="font-size:17px;font-weight:700;color:#56633f;background:#f0fae1;border:2px solid #ccdbb2;border-radius:999px;padding:9px 18px">נטען · 4.8MB</span>
+            </div>
+            <button style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:17px;font-size:20px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">חלץ נתונים מחדש</button>
+          </div>
+          <div style="margin-top:26px;background:#fff2eb;border:2px solid #ffc6a5;border-radius:16px;padding:20px;font-size:18px;line-height:1.65;color:#643312">
+            <b>טווח תאריכים בקובץ:</b> 01/01/2025 – 30/06/2026 — מאפשר הפקת דוח לתקופה הנבחרת ולתקופה המקבילה.
+          </div>
+        </div>
+
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px;margin-bottom:20px">רשומות שזוהו</div>
+          <table style="width:100%;border-collapse:collapse;font-size:19px">
+            <thead>
+              <tr style="background:#ebddc5">
+                <th style="text-align:right;padding:14px 16px;font-size:17px;color:#474238;border-radius:0 12px 12px 0">קוד</th>
+                <th style="text-align:right;padding:14px 16px;font-size:17px;color:#474238">תיאור</th>
+                <th style="text-align:left;padding:14px 16px;font-size:17px;color:#474238;border-radius:12px 0 0 12px">כמות</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ recordTypes }}" as="r" hint-placeholder-count="6">
+                <tr>
+                  <td style="padding:14px 16px;border-bottom:1.5px solid #eee7db;font-weight:700;font-family:ui-monospace,monospace">{{ r.code }}</td>
+                  <td style="padding:14px 16px;border-bottom:1.5px solid #eee7db">{{ r.desc }}</td>
+                  <td style="padding:14px 16px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ r.count }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- מאזן בוחן ומיון -->
+    <sc-if value="{{ isTb }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:24px;align-items:start">
+
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;overflow:hidden">
+          <div style="padding:26px 28px 18px 28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px;margin-left:auto">מאזן בוחן · מיון לביאורים</div>
+            <input value="{{ search }}" onChange="{{ setSearch }}" placeholder="חיפוש שם חשבון או כרטיס" style="font-size:19px;padding:12px 20px;border:2px solid #dcd3c4;border-radius:999px;width:260px;background:#f9f4ed" style-focus="border-color:#c67139;outline:none" />
+            <input value="{{ rangeFrom }}" onChange="{{ setRangeFrom }}" placeholder="מכרטיס" style="font-size:18px;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;width:120px;background:#f9f4ed;font-variant-numeric:tabular-nums" style-focus="border-color:#c67139;outline:none" />
+            <input value="{{ rangeTo }}" onChange="{{ setRangeTo }}" placeholder="עד כרטיס" style="font-size:18px;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;width:120px;background:#f9f4ed;font-variant-numeric:tabular-nums" style-focus="border-color:#c67139;outline:none" />
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ filters }}" as="f" hint-placeholder-count="3">
+                <button onClick="{{ f.go }}" style="{{ f.style }}">{{ f.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="margin:0 28px 16px 28px;background:#ebddc5;border-radius:16px;padding:16px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <div style="font-size:19px;font-weight:700">{{ selCountLabel }}</div>
+            <select value="{{ bulk }}" onChange="{{ setBulk }}" style="font-size:18px;font-weight:600;padding:11px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8;min-width:250px">
+              <option value="">הקצה את הסימון לביאור…</option>
+              <sc-for list="{{ noteOptions }}" as="o" hint-placeholder-count="14"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+            <button onClick="{{ applyBulk }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:11px 24px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">הקצה</button>
+            <button onClick="{{ clearSel }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:11px 20px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">בטל סימון</button>
+            <button onClick="{{ exportTb }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:11px 20px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא ל‑Excel</button>
+            <div style="margin-right:auto;font-size:17px;color:#474238;font-weight:600">↑ ↓ מעבר שורה · רווח לסימון · Enter כרטיס תנועות</div>
+          </div>
+
+          <div style="max-height:620px;overflow:auto;padding:0 28px 28px 28px">
+            <table style="width:100%;border-collapse:collapse;font-size:20px">
+              <thead>
+                <tr style="background:#ebddc5;position:sticky;top:0;z-index:2">
+                  <th style="padding:15px 12px;width:56px"><input type="checkbox" checked="{{ allChecked }}" onChange="{{ toggleAll }}" style="width:22px;height:22px;accent-color:#c67139;cursor:pointer" /></th>
+                  <th style="text-align:right;padding:15px 12px;font-size:17px;color:#474238;width:110px">כרטיס</th>
+                  <th style="text-align:right;padding:15px 12px;font-size:17px;color:#474238">שם החשבון</th>
+                  <th style="text-align:left;padding:15px 12px;font-size:17px;color:#474238;width:150px">{{ currLabel }}</th>
+                  <th style="{{ tbPrevThStyle }}">{{ prevLabel }}</th>
+                  <th style="text-align:left;padding:15px 12px;font-size:17px;color:#474238;width:140px">התאמות</th>
+                  <th style="{{ chgThStyle }}">שינוי</th>
+                  <th style="{{ chgPctThStyle }}">%</th>
+                  <th style="text-align:right;padding:15px 12px;font-size:17px;color:#474238;width:300px">ביאור</th>
+                  <th style="padding:15px 8px;width:56px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ rows }}" as="row" hint-placeholder-count="14">
+                  <tr style="{{ row.trStyle }}">
+                    <td style="padding:11px 12px;border-bottom:1.5px solid #eee7db"><input type="checkbox" checked="{{ row.checked }}" onChange="{{ row.toggle }}" style="width:22px;height:22px;accent-color:#c67139;cursor:pointer" /></td>
+                    <td style="padding:11px 12px;border-bottom:1.5px solid #eee7db;font-family:ui-monospace,monospace;font-size:18px;color:#645c50">{{ row.code }}</td>
+                    <td style="padding:11px 12px;border-bottom:1.5px solid #eee7db;font-weight:600">{{ row.name }}</td>
+                    <td style="padding:11px 12px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700">{{ row.curr }}</td>
+                    <td style="{{ row.prevTd }}">{{ row.prev }}</td>
+                    <td style="{{ row.adjTd }}">{{ row.adj }}</td>
+                    <td style="{{ row.chgTd }}">{{ row.chg }}</td>
+                    <td style="{{ row.chgPctTd }}">{{ row.chgPct }}</td>
+                    <td style="padding:11px 12px;border-bottom:1.5px solid #eee7db">
+                      <select value="{{ row.noteId }}" onChange="{{ row.setNote }}" style="{{ row.selStyle }}">
+                        <option value="">— לא מוין —</option>
+                        <sc-for list="{{ noteOptions }}" as="o" hint-placeholder-count="14"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+                      </select>
+                    </td>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #eee7db">
+                      <button onClick="{{ row.drill }}" title="כרטיס תנועות" style="background:#f9f4ed;border:2px solid #dcd3c4;border-radius:999px;width:40px;height:40px;font-size:18px;font-weight:700;cursor:pointer;color:#8c491a" style-hover="background:#ffe1d0;border-color:#c67139">₪</button>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="padding:20px 12px;font-size:20px;font-weight:800;border-top:3px solid #c0b6a5">סה״כ מאזן בוחן (חובה = זכות)</td>
+                  <td style="padding:20px 12px;text-align:left;font-size:20px;font-weight:800;border-top:3px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ tbTotal }}</td>
+                  <td style="{{ tbTotalPrevTdStyle }}">{{ tbTotalPrev }}</td>
+                  <td colspan="5" style="border-top:3px solid #c0b6a5"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:20px;position:sticky;top:20px">
+          <div style="{{ checkBoxStyle }}">
+            <div style="font-size:20px;font-weight:800">{{ checkTitle }}</div>
+            <div style="font-size:17px;line-height:1.6;margin-top:8px">{{ checkText }}</div>
+          </div>
+
+          <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:24px">
+            <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:22px">כללי מיון אוטומטיים</div>
+            <div style="font-size:17px;color:#645c50;margin:8px 0 16px 0;line-height:1.55">טווח כרטיסים → ביאור. הכללים נשמרים ומוחלים גם על תיקים חדשים.</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ ruleRows }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:8px;background:#f9f4ed;border:2px solid #eee7db;border-radius:16px;padding:12px 14px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:16px;color:#645c50;font-weight:600">מכרטיס</span>
+                    <input value="{{ r.from }}" onChange="{{ r.setFrom }}" style="width:92px;font-size:17px;font-weight:600;padding:9px 12px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8;font-variant-numeric:tabular-nums" />
+                    <span style="font-size:16px;color:#645c50;font-weight:600">עד</span>
+                    <input value="{{ r.to }}" onChange="{{ r.setTo }}" style="width:92px;font-size:17px;font-weight:600;padding:9px 12px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8;font-variant-numeric:tabular-nums" />
+                    <button onClick="{{ r.remove }}" style="margin-right:auto;background:#fffdf8;border:2px solid #dcd3c4;color:#8c491a;border-radius:999px;width:38px;height:38px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">×</button>
+                  </div>
+                  <select value="{{ r.noteId }}" onChange="{{ r.setNote }}" style="width:100%;font-size:17px;font-weight:600;padding:10px 14px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+                    <sc-for list="{{ noteOptions }}" as="o" hint-placeholder-count="14"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+                  </select>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+              <button onClick="{{ addRule }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:12px 20px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">+ כלל</button>
+              <button onClick="{{ applyRulesUn }}" style="background:#7a8a5e;color:#fffdf8;border:none;border-radius:999px;padding:12px 20px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#728157">החל על לא מוינו</button>
+              <button onClick="{{ applyRulesAll }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:12px 20px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1">החל על הכל</button>
+            </div>
+          </div>
+
+          <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:24px">
+            <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:22px">מבנה הביאורים</div>
+            <div style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto;margin-top:14px">
+              <sc-for list="{{ noteCards }}" as="n" hint-placeholder-count="10">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f9f4ed;border:2px solid #eee7db;border-radius:16px;padding:12px 14px">
+                  <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                    <div style="width:38px;height:38px;flex:none;border-radius:999px;background:#c67139;color:#fffdf8;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700">{{ n.num }}</div>
+                    <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                      <div style="font-size:18px;font-weight:700">{{ n.name }}</div>
+                      <div style="font-size:15px;color:#645c50">{{ n.count }} סעיפים</div>
+                    </div>
+                  </div>
+                  <div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#8c491a">{{ n.total }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <button onClick="{{ goNotes }}" style="margin-top:16px;width:100%;background:#fffdf8;color:#8c491a;border:2px solid #c67139;border-radius:999px;padding:14px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0">ניהול ועריכת ביאורים</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- פקודות יומן -->
+    <sc-if value="{{ isJournals }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:24px;align-items:start;max-width:1600px">
+
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+              <div>
+                <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:28px">{{ editingLabel }}</div>
+                <div style="font-size:18px;color:#645c50;margin-top:8px">פקודות ההתאמה נרשמות מעל הנתונים מהקבצים ומשפיעות על סעיפי המאזן והרווח והפסד לפי תאריך הפקודה.</div>
+              </div>
+              <span style="font-size:17px;font-weight:700;color:#8c491a;background:#fff2eb;border:2px solid #ffc6a5;border-radius:999px;padding:10px 20px">{{ formPeriodLabel }}</span>
+            </div>
+
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:24px">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:17px;font-weight:700;color:#645c50">תאריך הפקודה</span>
+                <input type="date" value="{{ formDate }}" onChange="{{ setFormDate }}" style="font-size:19px;font-weight:600;padding:13px 20px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed" style-focus="border-color:#c67139;outline:none" />
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:280px">
+                <span style="font-size:17px;font-weight:700;color:#645c50">תיאור</span>
+                <input value="{{ formDesc }}" onChange="{{ setFormDesc }}" placeholder="למשל: הפרדת שיקים לגביה ולפירעון מכרטיס הבנק" style="width:100%;font-size:19px;padding:13px 20px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed" style-focus="border-color:#c67139;outline:none" />
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:22px">
+              <sc-for list="{{ formLines }}" as="l" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:12px;background:#f9f4ed;border:2px solid #eee7db;border-radius:16px;padding:14px 16px;flex-wrap:wrap">
+                  <select value="{{ l.code }}" onChange="{{ l.setCode }}" style="flex:1;min-width:280px;font-size:18px;font-weight:600;padding:12px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8">
+                    <option value="">בחר כרטיס…</option>
+                    <sc-for list="{{ acctOptions }}" as="o" hint-placeholder-count="20"><option value="{{ o.code }}">{{ o.label }}</option></sc-for>
+                  </select>
+                  <div style="display:flex;gap:8px">
+                    <button onClick="{{ l.setD }}" style="{{ l.dStyle }}">חובה</button>
+                    <button onClick="{{ l.setC }}" style="{{ l.cStyle }}">זכות</button>
+                  </div>
+                  <input value="{{ l.amount }}" onChange="{{ l.setAmount }}" placeholder="סכום" style="width:160px;font-size:19px;font-weight:700;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;background:#fffdf8;font-variant-numeric:tabular-nums;text-align:left" style-focus="border-color:#c67139;outline:none" />
+                  <button onClick="{{ l.remove }}" style="background:#fffdf8;border:2px solid #dcd3c4;color:#8c491a;border-radius:999px;width:42px;height:42px;font-size:19px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">×</button>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:22px">
+              <button onClick="{{ addLine }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:13px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">+ שורה</button>
+              <span style="font-size:18px;font-weight:700;color:#474238">סה״כ חובה: {{ formDebit }}</span>
+              <span style="font-size:18px;font-weight:700;color:#474238">סה״כ זכות: {{ formCredit }}</span>
+              <span style="{{ formDiffStyle }}">{{ formDiffLabel }}</span>
+              <div style="display:flex;gap:12px;margin-right:auto">
+                <button onClick="{{ cancelEdit }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:14px 24px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">נקה טופס</button>
+                <button onClick="{{ saveEntry }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:14px 30px;font-size:19px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">שמור פקודה</button>
+              </div>
+            </div>
+            <div style="font-size:18px;font-weight:700;color:#56633f;margin-top:16px">{{ jStatus }}</div>
+          </div>
+
+          <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+              <div>
+                <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px">פקודות שנרשמו</div>
+                <div style="font-size:18px;color:#645c50;margin-top:8px">{{ journalCountLabel }}</div>
+              </div>
+              <button onClick="{{ exportJournals }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:13px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא ל‑Excel</button>
+            </div>
+
+            <sc-if value="{{ journalsEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:22px;background:#f9f4ed;border:2.5px dashed #c0b6a5;border-radius:28px;padding:34px;font-size:19px;color:#645c50;line-height:1.7">טרם נרשמו פקודות יומן. דוגמה: לחובת "שיקים לגביה" ולזכות "בנק לאומי", ולחובת "בנק לאומי" ולזכות "שיקים לפירעון".</div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:16px;margin-top:22px">
+              <sc-for list="{{ journalRows }}" as="j" hint-placeholder-count="2">
+                <div style="border:2px solid #eee7db;border-radius:28px;padding:22px 24px;background:#f9f4ed">
+                  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                    <div style="width:42px;height:42px;flex:none;border-radius:999px;background:#c67139;color:#fffdf8;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">{{ j.num }}</div>
+                    <div style="font-size:20px;font-weight:700">{{ j.desc }}</div>
+                    <div style="font-size:18px;color:#645c50;font-variant-numeric:tabular-nums">{{ j.date }}</div>
+                    <span style="{{ j.badgeStyle }}">{{ j.badge }}</span>
+                    <div style="display:flex;gap:10px;margin-right:auto">
+                      <button onClick="{{ j.edit }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:10px 18px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">עריכה</button>
+                      <button onClick="{{ j.duplicate }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:10px 18px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">שכפול</button>
+                      <button onClick="{{ j.remove }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:10px 18px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">מחיקה</button>
+                    </div>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:14px">
+                    <thead>
+                      <tr>
+                        <th style="text-align:right;padding:9px 12px;font-size:16px;color:#645c50;border-bottom:1.5px solid #dcd3c4">כרטיס</th>
+                        <th style="text-align:left;padding:9px 12px;font-size:16px;color:#645c50;width:150px;border-bottom:1.5px solid #dcd3c4">חובה</th>
+                        <th style="text-align:left;padding:9px 12px;font-size:16px;color:#645c50;width:150px;border-bottom:1.5px solid #dcd3c4">זכות</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ j.rows }}" as="r" hint-placeholder-count="2">
+                        <tr>
+                          <td style="padding:9px 12px;border-bottom:1px solid #eee7db;font-weight:600">{{ r.name }}</td>
+                          <td style="padding:9px 12px;border-bottom:1px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700">{{ r.debit }}</td>
+                          <td style="padding:9px 12px;border-bottom:1px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700">{{ r.credit }}</td>
+                        </tr>
+                      </sc-for>
+                      <tr>
+                        <td style="padding:11px 12px;font-weight:800;border-top:2px solid #c0b6a5">סה״כ הפקודה</td>
+                        <td style="padding:11px 12px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ j.total }}</td>
+                        <td style="padding:11px 12px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ j.total }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:26px;position:sticky;top:20px">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:22px">כרטיס התאמה חדש</div>
+          <div style="font-size:17px;color:#645c50;margin:8px 0 18px 0;line-height:1.6">כרטיס שאינו קיים בקבצים — למשל "שיקים לגביה" — כדי שיוכל לקבל ביטוי במאזן.</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <input value="{{ newAcctCode }}" onChange="{{ setNewAcctCode }}" placeholder="מספר כרטיס" style="font-size:18px;font-weight:600;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed;font-variant-numeric:tabular-nums" style-focus="border-color:#c67139;outline:none" />
+            <input value="{{ newAcctName }}" onChange="{{ setNewAcctName }}" placeholder="שם הכרטיס" style="font-size:18px;font-weight:600;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed" style-focus="border-color:#c67139;outline:none" />
+            <select value="{{ newAcctNote }}" onChange="{{ setNewAcctNote }}" style="font-size:18px;font-weight:600;padding:12px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed">
+              <option value="">— ללא ביאור —</option>
+              <sc-for list="{{ noteOptions }}" as="o" hint-placeholder-count="14"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+            <button onClick="{{ addAcct }}" style="background:#7a8a5e;color:#fffdf8;border:none;border-radius:999px;padding:14px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#728157">הוסף כרטיס</button>
+          </div>
+
+          <div style="margin-top:26px;padding-top:22px;border-top:2px solid #eee7db;font-size:17px;color:#645c50;line-height:1.7">
+            <b style="color:#201e1d">איך זה עובד</b><br />פקודה שתאריכה בתוך {{ currLabel }} משפיעה על העמודה הנוכחית; פקודה בתוך {{ prevLabel }} משפיעה על התקופה המקבילה. במאזן הבוחן מוצגת עמודת "התאמות", ובכרטיס התנועות הפקודות מופיעות בשורות נפרדות.{{ prevOffNote }}
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ביאורים -->
+    <sc-if value="{{ isNotes }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:1280px;display:flex;flex-direction:column;gap:24px">
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+            <div>
+              <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:28px">ניהול ביאורים</div>
+              <div style="font-size:18px;color:#645c50;margin-top:8px">ערוך שם ביאור, שנה את הקבוצה שבה הוא מוצג בדוח, או הוסף ביאור חדש.</div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button onClick="{{ saveTemplate }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">שמור תבנית ללקוח</button>
+              <button onClick="{{ loadTemplate }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">טען תבנית הלקוח</button>
+              <button onClick="{{ setDefaultTemplate }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">קבע כברירת מחדל</button>
+              <button onClick="{{ applyDefaultTemplate }}" style="background:#fffdf8;color:#474238;border:2px solid #dcd3c4;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">החל ברירת מחדל</button>
+              <button onClick="{{ addNote }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:14px 26px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">+ ביאור חדש</button>
+            </div>
+          </div>
+          <div style="font-size:17px;color:#56633f;font-weight:700;margin-top:14px">{{ templateStatus }}</div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:19px;margin-top:22px">
+            <thead>
+              <tr style="background:#ebddc5">
+                <th style="text-align:right;padding:15px 16px;font-size:17px;color:#474238;width:80px;border-radius:0 12px 12px 0">מס׳</th>
+                <th style="text-align:right;padding:15px 16px;font-size:17px;color:#474238">שם הביאור</th>
+                <th style="text-align:right;padding:15px 16px;font-size:17px;color:#474238;width:280px">קבוצה בדוח</th>
+                <th style="text-align:left;padding:15px 16px;font-size:17px;color:#474238;width:110px">סעיפים</th>
+                <th style="text-align:left;padding:15px 16px;font-size:17px;color:#474238;width:150px">יתרה</th>
+                <th style="width:90px;border-radius:12px 0 0 12px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ noteRows }}" as="n" hint-placeholder-count="14">
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db;font-weight:700">{{ n.num }}</td>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db">
+                    <input value="{{ n.name }}" onChange="{{ n.rename }}" style="width:100%;font-size:20px;font-weight:600;padding:12px 18px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed" style-focus="border-color:#c67139;outline:none" />
+                  </td>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db">
+                    <select value="{{ n.group }}" onChange="{{ n.setGroup }}" style="width:100%;font-size:18px;font-weight:600;padding:12px 16px;border:2px solid #dcd3c4;border-radius:999px;background:#f9f4ed">
+                      <sc-for list="{{ groupOptions }}" as="g" hint-placeholder-count="9"><option value="{{ g }}">{{ g }}</option></sc-for>
+                    </select>
+                  </td>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ n.count }}</td>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700">{{ n.total }}</td>
+                  <td style="padding:12px 16px;border-bottom:1.5px solid #eee7db;text-align:left">
+                    <button onClick="{{ n.remove }}" style="background:#fffdf8;border:2px solid #dcd3c4;color:#8c491a;border-radius:999px;padding:10px 16px;font-size:17px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">מחק</button>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:32px">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:24px">ביאור כללי — מהות העסק ועיקרי מדיניות חשבונאית</div>
+          <div style="font-size:17px;color:#645c50;margin:8px 0 16px 0">הטקסט נשמר ללקוח ומודפס כעמוד הביאור הראשון.</div>
+          <textarea value="{{ generalNote }}" onChange="{{ setGeneralNote }}" rows="9" style="width:100%;font-size:19px;line-height:1.7;padding:20px 24px;border:2px solid #dcd3c4;border-radius:28px;background:#f9f4ed;resize:vertical" style-focus="border-color:#c67139;outline:none"></textarea>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- מאזן -->
+    <sc-if value="{{ isBs }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px">
+        <div style="{{ warnBoxStyle }}">
+          <div style="font-size:19px;font-weight:800">{{ warnTitle }}</div>
+          <div style="font-size:17px;margin-top:6px;line-height:1.6">{{ warnText }}</div>
+        </div>
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:52px 64px;box-shadow:0 12px 32px rgba(46,43,37,0.16)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:22px;border-bottom:3px solid #201e1d">
+            <div>
+              <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:30px">{{ clientName }}</div>
+              <div style="font-size:22px;font-weight:700;margin-top:10px">מאזן ליום {{ asOfLabel }}</div>
+              <div style="font-size:18px;color:#645c50;margin-top:6px">{{ unitLabel }}</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ exportBs }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא ל‑Excel</button>
+              <button onClick="{{ goPrint }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:14px 26px;font-size:19px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">תצוגת הדפסה</button>
+            </div>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:20px">
+            <thead>
+              <tr>
+                <th style="padding:20px 8px 12px 8px"></th>
+                <th style="text-align:center;padding:20px 8px 12px 8px;font-size:17px;color:#645c50;width:90px">ביאור</th>
+                <th style="text-align:left;padding:20px 8px 12px 8px;font-size:18px;font-weight:700;width:170px;border-bottom:2px solid #c0b6a5">{{ currLabel }}</th>
+                <th style="{{ bsPlPrevThStyle }}">{{ prevLabel }}</th>
+                <th style="{{ chgThStyle }}">שינוי</th>
+                <th style="{{ chgPctThStyle }}">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ bsSections }}" as="s" hint-placeholder-count="5">
+                <tr><td colspan="6" style="padding:28px 8px 10px 8px;font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:21px;color:#8c491a">{{ s.title }}</td></tr>
+                <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="4">
+                  <tr>
+                    <td style="padding:11px 24px 11px 8px;border-bottom:1.5px solid #f2ece0">{{ r.name }}</td>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #f2ece0;text-align:center;color:#8c491a;font-weight:700">{{ r.num }}</td>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ r.curr }}</td>
+                    <td style="{{ r.prevTdLive }}">{{ r.prev }}</td>
+                    <td style="{{ r.chgTd }}">{{ r.chg }}</td>
+                    <td style="{{ r.chgPctTd }}">{{ r.chgPct }}</td>
+                  </tr>
+                </sc-for>
+                <tr>
+                  <td style="padding:13px 24px 13px 8px;font-weight:800;border-top:2px solid #c0b6a5">{{ s.totalLabel }}</td>
+                  <td style="border-top:2px solid #c0b6a5"></td>
+                  <td style="padding:13px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ s.total }}</td>
+                  <td style="{{ s.prevTotalLive }}">{{ s.totalPrev }}</td>
+                  <td style="{{ s.chgTd }}">{{ s.chg }}</td>
+                  <td style="{{ s.chgPctTd }}">{{ s.chgPct }}</td>
+                </tr>
+              </sc-for>
+              <tr>
+                <td style="padding:28px 8px 12px 8px;font-size:22px;font-weight:800;border-top:4px double #201e1d">{{ bsFooterLabel }}</td>
+                <td style="border-top:4px double #201e1d"></td>
+                <td style="padding:28px 8px 12px 8px;text-align:left;font-size:22px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums">{{ bsFooterCurr }}</td>
+                <td style="{{ bsFooterPrevTdLiveStyle }}">{{ bsFooterPrev }}</td>
+                <td colspan="2" style="border-top:4px double #201e1d"></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top:34px;font-size:18px;color:#645c50;line-height:1.65">הביאורים המצורפים מהווים חלק בלתי נפרד מהדוחות הכספיים.</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- רווח והפסד -->
+    <sc-if value="{{ isPl }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px">
+        <div style="{{ warnBoxStyle }}">
+          <div style="font-size:19px;font-weight:800">{{ warnTitle }}</div>
+          <div style="font-size:17px;margin-top:6px;line-height:1.6">{{ warnText }}</div>
+        </div>
+        <div style="background:#fffdf8;border:2px solid #dcd3c4;border-radius:28px;padding:52px 64px;box-shadow:0 12px 32px rgba(46,43,37,0.16)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:22px;border-bottom:3px solid #201e1d">
+            <div>
+              <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:30px">{{ clientName }}</div>
+              <div style="font-size:22px;font-weight:700;margin-top:10px">דוח רווח והפסד לתקופה {{ currLabel }}</div>
+              <div style="font-size:18px;color:#645c50;margin-top:6px">{{ unitLabel }}{{ plSubtitleTail }}</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ exportPl }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:14px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא ל‑Excel</button>
+              <button onClick="{{ goPrint }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:14px 26px;font-size:19px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">תצוגת הדפסה</button>
+            </div>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:20px">
+            <thead>
+              <tr>
+                <th style="padding:20px 8px 12px 8px"></th>
+                <th style="text-align:center;padding:20px 8px 12px 8px;font-size:17px;color:#645c50;width:90px">ביאור</th>
+                <th style="text-align:left;padding:20px 8px 12px 8px;font-size:18px;font-weight:700;width:170px;border-bottom:2px solid #c0b6a5">{{ currLabel }}</th>
+                <th style="{{ bsPlPrevThStyle }}">{{ prevLabel }}</th>
+                <th style="{{ chgThStyle }}">שינוי</th>
+                <th style="{{ chgPctThStyle }}">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ plBlocks }}" as="b" hint-placeholder-count="4">
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="3">
+                  <tr>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #f2ece0">{{ r.name }}</td>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #f2ece0;text-align:center;color:#8c491a;font-weight:700">{{ r.num }}</td>
+                    <td style="padding:11px 8px;border-bottom:1.5px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ r.curr }}</td>
+                    <td style="{{ r.prevTdLive }}">{{ r.prev }}</td>
+                    <td style="{{ r.chgTd }}">{{ r.chg }}</td>
+                    <td style="{{ r.chgPctTd }}">{{ r.chgPct }}</td>
+                  </tr>
+                </sc-for>
+                <tr style="background:#f9f4ed">
+                  <td style="padding:15px 8px;font-weight:800;border-top:2px solid #c0b6a5">{{ b.totalLabel }}</td>
+                  <td style="border-top:2px solid #c0b6a5"></td>
+                  <td style="padding:15px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ b.total }}</td>
+                  <td style="{{ b.prevTotalLive }}">{{ b.totalPrev }}</td>
+                  <td style="{{ b.chgTd }}">{{ b.chg }}</td>
+                  <td style="{{ b.chgPctTd }}">{{ b.chgPct }}</td>
+                </tr>
+              </sc-for>
+              <tr>
+                <td style="padding:28px 8px 12px 8px;font-size:22px;font-weight:800;border-top:4px double #201e1d">רווח (הפסד) לפני מיסים על ההכנסה</td>
+                <td style="border-top:4px double #201e1d"></td>
+                <td style="padding:28px 8px 12px 8px;text-align:left;font-size:22px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums">{{ pretaxCurr }}</td>
+                <td style="{{ pretaxPrevTdLiveStyle }}">{{ pretaxPrev }}</td>
+                <td style="{{ pretaxChgTd }}">{{ pretaxChg }}</td>
+                <td style="{{ pretaxChgPctTd }}">{{ pretaxChgPct }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- תצוגת הדפסה -->
+    <sc-if value="{{ isPrint }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:32px">
+        <div class="no-print" style="width:100%;max-width:900px;background:#ebddc5;border-radius:28px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
+          <div style="font-size:19px;font-weight:700">{{ bookletLabel }}</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <button onClick="{{ exportAll }}" style="background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:12px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא ל‑Excel</button>
+            <button onClick="{{ doPrint }}" style="background:#fffdf8;color:#8c491a;border:2px solid #dcd3c4;border-radius:999px;padding:12px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">הורדה כ־PDF</button>
+            <button onClick="{{ doPrint }}" style="background:#c67139;color:#fffdf8;border:none;border-radius:999px;padding:12px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#b2622d">הדפסה</button>
+          </div>
+        </div>
+
+        <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:80px 72px;min-height:1150px;display:flex;flex-direction:column">
+          <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:40px;line-height:1.25">{{ clientName }}</div>
+          <div style="font-size:20px;color:#645c50;margin-top:12px">ח.פ {{ clientId }}</div>
+          <div style="margin-top:64px;font-size:28px;font-weight:700">דוחות כספיים</div>
+          <div style="font-size:24px;margin-top:12px">לתקופה {{ currLabel }}</div>
+          <sc-if value="{{ prevOn }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:20px;color:#645c50;margin-top:8px">בהשוואה לתקופה המקבילה {{ prevLabel }}</div>
+          </sc-if>
+          <div style="margin-top:auto;padding-top:40px;border-top:2px solid #dcd3c4;font-size:18px;color:#645c50;line-height:1.7">נערך על ידי מסעוד אסעד, יועץ מס מוסמך<br />{{ unitLabel }} · הדוחות נערכו על בסיס הנהלת חשבונות כפולה ואינם מבוקרים</div>
+        </div>
+
+        <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:64px 72px;min-height:1150px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #dcd3c4;padding-bottom:10px;font-size:16px;color:#645c50">
+            <span>{{ clientName }}</span><span>{{ currLabel }}</span>
+          </div>
+          <div style="font-size:24px;font-weight:800;margin-top:34px">מכתב ליווי</div>
+          <div style="font-size:18px;line-height:1.9;margin-top:22px">לכבוד<br />הנהלת {{ clientName }}<br /><br />הנדון: דוחות כספיים לתקופה {{ currLabel }}<br /><br />בהמשך לבקשתכם ערכתי את הדוחות הכספיים המצורפים — מאזן ליום {{ asOfLabel }} ודוח רווח והפסד לתקופה {{ currLabel }}{{ comparisonClause }}. הדוחות נערכו על בסיס ספרי הנהלת החשבונות של החברה, כפי שנקלטו מקבצי המבנה האחיד, ועל בסיס המידע שהומצא לי על ידכם.<br /><br />הדוחות אינם מבוקרים ואינם סקורים, ואין באמור בהם חיווי דעה על נאותות ההצגה.<br /><br />בכבוד רב,</div>
+          <div style="margin-top:auto;padding-top:36px;font-size:18px;line-height:1.7">מסעוד אסעד<br />יועץ מס מוסמך</div>
+          <div style="margin-top:22px;font-size:16px;color:#645c50;text-align:left">{{ footer2 }}</div>
+        </div>
+
+        <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:64px 72px;min-height:1150px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #dcd3c4;padding-bottom:10px;font-size:16px;color:#645c50">
+            <span>{{ clientName }}</span><span>{{ unitLabel }}</span>
+          </div>
+          <div style="font-size:24px;font-weight:800;margin-top:24px;border-bottom:3px solid #201e1d;padding-bottom:12px">מאזן ליום {{ asOfLabel }}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:19px">
+            <thead>
+              <tr>
+                <th style="padding:18px 8px 10px 8px"></th>
+                <th style="text-align:center;padding:18px 8px 10px 8px;font-size:16px;color:#645c50;width:80px">ביאור</th>
+                <th style="text-align:left;padding:18px 8px 10px 8px;font-size:17px;font-weight:700;width:150px;border-bottom:2px solid #c0b6a5">{{ currLabel }}</th>
+                <th style="{{ printPrevThStyle }}">{{ prevLabel }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ bsSections }}" as="s" hint-placeholder-count="5">
+                <tr><td colspan="4" style="padding:22px 8px 8px 8px;font-weight:800;font-size:19px;color:#8c491a">{{ s.title }}</td></tr>
+                <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="4">
+                  <tr>
+                    <td style="padding:9px 20px 9px 8px;border-bottom:1px solid #f2ece0">{{ r.name }}</td>
+                    <td style="padding:9px 8px;border-bottom:1px solid #f2ece0;text-align:center;color:#8c491a;font-weight:700">{{ r.num }}</td>
+                    <td style="padding:9px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ r.curr }}</td>
+                    <td style="{{ r.prevTdPrint }}">{{ r.prev }}</td>
+                  </tr>
+                </sc-for>
+                <tr>
+                  <td style="padding:11px 20px 11px 8px;font-weight:800;border-top:2px solid #c0b6a5">{{ s.totalLabel }}</td>
+                  <td style="border-top:2px solid #c0b6a5"></td>
+                  <td style="padding:11px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ s.total }}</td>
+                  <td style="{{ s.prevTotalPrint }}">{{ s.totalPrev }}</td>
+                </tr>
+              </sc-for>
+              <tr>
+                <td style="padding:24px 8px 10px 8px;font-size:20px;font-weight:800;border-top:4px double #201e1d">{{ bsFooterLabel }}</td>
+                <td style="border-top:4px double #201e1d"></td>
+                <td style="padding:24px 8px 10px 8px;text-align:left;font-size:20px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums">{{ bsFooterCurr }}</td>
+                <td style="{{ bsFooterPrevTdPrintStyle }}">{{ bsFooterPrev }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:26px;font-size:16px;color:#645c50;display:flex;justify-content:space-between"><span>הביאורים המצורפים מהווים חלק בלתי נפרד מהדוחות הכספיים.</span><span>{{ footer3 }}</span></div>
+        </div>
+
+        <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:64px 72px;min-height:1150px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #dcd3c4;padding-bottom:10px;font-size:16px;color:#645c50">
+            <span>{{ clientName }}</span><span>{{ unitLabel }}</span>
+          </div>
+          <div style="font-size:24px;font-weight:800;margin-top:24px;border-bottom:3px solid #201e1d;padding-bottom:12px">דוח רווח והפסד לתקופה {{ currLabel }}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:19px">
+            <thead>
+              <tr>
+                <th style="padding:18px 8px 10px 8px"></th>
+                <th style="text-align:center;padding:18px 8px 10px 8px;font-size:16px;color:#645c50;width:80px">ביאור</th>
+                <th style="text-align:left;padding:18px 8px 10px 8px;font-size:17px;font-weight:700;width:150px;border-bottom:2px solid #c0b6a5">{{ currLabel }}</th>
+                <th style="{{ printPrevThStyle }}">{{ prevLabel }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ plBlocks }}" as="b" hint-placeholder-count="4">
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="3">
+                  <tr>
+                    <td style="padding:9px 8px;border-bottom:1px solid #f2ece0">{{ r.name }}</td>
+                    <td style="padding:9px 8px;border-bottom:1px solid #f2ece0;text-align:center;color:#8c491a;font-weight:700">{{ r.num }}</td>
+                    <td style="padding:9px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;font-weight:600">{{ r.curr }}</td>
+                    <td style="{{ r.prevTdPrint }}">{{ r.prev }}</td>
+                  </tr>
+                </sc-for>
+                <tr style="background:#f9f4ed">
+                  <td style="padding:13px 8px;font-weight:800;border-top:2px solid #c0b6a5">{{ b.totalLabel }}</td>
+                  <td style="border-top:2px solid #c0b6a5"></td>
+                  <td style="padding:13px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ b.total }}</td>
+                  <td style="{{ b.prevTotalPrint }}">{{ b.totalPrev }}</td>
+                </tr>
+              </sc-for>
+              <tr>
+                <td style="padding:24px 8px 10px 8px;font-size:20px;font-weight:800;border-top:4px double #201e1d">רווח (הפסד) לפני מיסים על ההכנסה</td>
+                <td style="border-top:4px double #201e1d"></td>
+                <td style="padding:24px 8px 10px 8px;text-align:left;font-size:20px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums">{{ pretaxCurr }}</td>
+                <td style="{{ pretaxPrevTdPrintStyle }}">{{ pretaxPrev }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:26px;font-size:16px;color:#645c50;text-align:left">{{ footer4 }}</div>
+        </div>
+
+        <sc-for list="{{ noteSheets }}" as="s" hint-placeholder-count="2">
+          <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:64px 72px;min-height:1150px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #dcd3c4;padding-bottom:10px;font-size:16px;color:#645c50">
+              <span>{{ clientName }}</span><span>{{ unitLabel }}</span>
+            </div>
+            <div style="font-size:24px;font-weight:800;margin-top:24px;border-bottom:3px solid #201e1d;padding-bottom:12px">{{ s.title }}</div>
+            <sc-if value="{{ s.showGeneral }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:22px">
+                <div style="font-size:19px;font-weight:800;color:#8c491a">ביאור כללי — מהות העסק ועיקרי מדיניות חשבונאית</div>
+                <div style="font-size:17px;line-height:1.75;margin-top:8px;white-space:pre-wrap">{{ s.general }}</div>
+              </div>
+            </sc-if>
+            <sc-for list="{{ s.notes }}" as="d" hint-placeholder-count="4">
+              <div style="margin-top:26px">
+                <div style="font-size:19px;font-weight:800;color:#8c491a">ביאור {{ d.num }} — {{ d.name }}</div>
+              <table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:8px">
+                <thead>
+                  <tr>
+                    <th style="text-align:right;padding:8px;font-size:16px;color:#645c50;border-bottom:1.5px solid #dcd3c4">הרכב</th>
+                    <th style="text-align:left;padding:8px;font-size:16px;color:#645c50;width:140px;border-bottom:1.5px solid #dcd3c4">{{ currLabel }}</th>
+                    <th style="{{ notePrevThStyle }}">{{ prevLabel }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ d.rows }}" as="r" hint-placeholder-count="3">
+                    <tr>
+                      <td style="padding:7px 8px;border-bottom:1px solid #f2ece0">{{ r.name }}</td>
+                      <td style="padding:7px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums">{{ r.curr }}</td>
+                      <td style="{{ r.prevTd }}">{{ r.prev }}</td>
+                    </tr>
+                  </sc-for>
+                  <tr>
+                    <td style="padding:9px 8px;font-weight:800;border-top:2px solid #c0b6a5">סה״כ</td>
+                    <td style="padding:9px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ d.total }}</td>
+                    <td style="{{ d.prevTotalStyle }}">{{ d.totalPrev }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              </div>
+            </sc-for>
+            <div style="margin-top:26px;font-size:16px;color:#645c50;text-align:left">{{ s.footer }}</div>
+          </div>
+        </sc-for>
+
+        <sc-for list="{{ journalSheets }}" as="s" hint-placeholder-count="1">
+          <div class="print-sheet" style="width:860px;background:#fffdf8;border-radius:16px;box-shadow:0 12px 32px rgba(46,43,37,0.22);padding:64px 72px;min-height:1150px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #dcd3c4;padding-bottom:10px;font-size:16px;color:#645c50">
+              <span>{{ clientName }}</span><span>{{ unitLabel }}</span>
+            </div>
+            <div style="font-size:24px;font-weight:800;margin-top:24px;border-bottom:3px solid #201e1d;padding-bottom:12px">{{ s.title }}</div>
+            <sc-for list="{{ s.entries }}" as="e" hint-placeholder-count="2">
+              <div style="margin-top:22px">
+                <div style="font-size:18px;font-weight:800;color:#8c491a">פקודה {{ e.num }} · {{ e.date }} — {{ e.desc }} ({{ e.badge }})</div>
+                <table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:8px">
+                  <thead>
+                    <tr>
+                      <th style="text-align:right;padding:8px;font-size:16px;color:#645c50;border-bottom:1.5px solid #dcd3c4">כרטיס</th>
+                      <th style="text-align:left;padding:8px;font-size:16px;color:#645c50;width:140px;border-bottom:1.5px solid #dcd3c4">חובה</th>
+                      <th style="text-align:left;padding:8px;font-size:16px;color:#645c50;width:140px;border-bottom:1.5px solid #dcd3c4">זכות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ e.rows }}" as="r" hint-placeholder-count="2">
+                      <tr>
+                        <td style="padding:7px 8px;border-bottom:1px solid #f2ece0">{{ r.name }}</td>
+                        <td style="padding:7px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums">{{ r.debit }}</td>
+                        <td style="padding:7px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums">{{ r.credit }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </sc-for>
+            <div style="margin-top:26px;font-size:16px;color:#645c50;text-align:left">{{ s.footer }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+  </main>
+
+  <!-- כרטיס תנועות -->
+  <sc-if value="{{ hasDrill }}" hint-placeholder-val="{{ false }}">
+    <div class="no-print" style="position:fixed;inset:0;background:rgba(32,30,29,0.45);display:flex;align-items:center;justify-content:center;padding:40px;z-index:50">
+      <div style="width:100%;max-width:980px;max-height:88vh;overflow:auto;background:#fffdf8;border-radius:28px;padding:36px 40px;box-shadow:0 12px 32px rgba(46,43,37,0.3)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px">
+          <div>
+            <div style="font-family:Caprasimo,Assistant,sans-serif;font-weight:800;font-size:26px">{{ drillTitle }}</div>
+            <div style="font-size:18px;color:#645c50;margin-top:8px">{{ drillSub }}</div>
+          </div>
+          <button onClick="{{ closeDrill }}" style="background:#fffdf8;border:2px solid #dcd3c4;color:#8c491a;border-radius:999px;padding:12px 22px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#ffe1d0;border-color:#c67139">סגור</button>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;font-size:19px;margin-top:24px">
+          <thead>
+            <tr style="background:#ebddc5">
+              <th style="text-align:right;padding:13px 14px;font-size:16px;color:#474238;width:130px;border-radius:0 12px 12px 0">תאריך</th>
+              <th style="text-align:right;padding:13px 14px;font-size:16px;color:#474238;width:130px">אסמכתא</th>
+              <th style="text-align:right;padding:13px 14px;font-size:16px;color:#474238">תיאור</th>
+              <th style="text-align:left;padding:13px 14px;font-size:16px;color:#474238;width:140px">חובה</th>
+              <th style="text-align:left;padding:13px 14px;font-size:16px;color:#474238;width:140px">זכות</th>
+              <th style="text-align:left;padding:13px 14px;font-size:16px;color:#474238;width:150px;border-radius:12px 0 0 12px">יתרה מתגלגלת</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ drillRows }}" as="t" hint-placeholder-count="8">
+              <tr>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db;font-variant-numeric:tabular-nums">{{ t.date }}</td>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db;font-family:ui-monospace,monospace;font-size:17px;color:#645c50">{{ t.ref }}</td>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db">{{ t.desc }}</td>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums">{{ t.debit }}</td>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums">{{ t.credit }}</td>
+                <td style="padding:11px 14px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700">{{ t.run }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="padding:16px 14px;font-weight:800;border-top:3px solid #c0b6a5">סה״כ תנועות בתקופה</td>
+              <td style="padding:16px 14px;text-align:left;font-weight:800;border-top:3px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ drillDebit }}</td>
+              <td style="padding:16px 14px;text-align:left;font-weight:800;border-top:3px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ drillCredit }}</td>
+              <td style="padding:16px 14px;text-align:left;font-weight:800;border-top:3px solid #c0b6a5;font-variant-numeric:tabular-nums">{{ drillBalance }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <button onClick="{{ exportDrill }}" style="margin-top:22px;background:#fffdf8;color:#56633f;border:2px solid #ccdbb2;border-radius:999px;padding:13px 24px;font-size:18px;font-weight:700;cursor:pointer" style-hover="background:#f0fae1;border-color:#7a8a5e">ייצוא הכרטיס ל‑Excel</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1600,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'tb', search: '', filter: 'all', rangeFrom: '', rangeTo: '', bulk: '', sel: {}, cursor: 0,
+    drill: null, unit: 'ones', showChange: false, showPrev: true, hc: false, zoomIdx: 0, seq: 100, printBudget: 900,
+    journals: [], editingId: null, jStatus: '',
+    form: { date: '2026-06-30', desc: '', lines: [{ code: '', amount: '', side: 'D' }, { code: '', amount: '', side: 'C' }] },
+    newAcct: { code: '', name: '', note: '' },
+    year: 2026, fromM: 1, toM: 6, clientIdx: 0, templateStatus: '',
+    generalNote: 'החברה עוסקת בסחר ובשיווק סחורות בישראל. הדוחות הכספיים נערכו על בסיס מצטבר, בהתאם לכללי חשבונאות מקובלים. המלאי מוצג לפי העלות או שווי השוק, כנמוך שביניהם. הרכוש הקבוע מוצג לפי עלות בניכוי פחת נצבר, המחושב לפי שיעורים מקובלים בשיטת הקו הישר.',
+    rules: [
+      { id: 'r1', from: '1000', to: '1049', noteId: 'b1' },
+      { id: 'r2', from: '6000', to: '6099', noteId: 'p3' },
+      { id: 'r3', from: '6100', to: '6499', noteId: 'p4' }
+    ],
+    notes: [
+      { id: 'b1', name: 'מזומנים ושווי מזומנים', group: 'נכסים שוטפים' },
+      { id: 'b2', name: 'לקוחות', group: 'נכסים שוטפים' },
+      { id: 'b3', name: 'חייבים ויתרות חובה', group: 'נכסים שוטפים' },
+      { id: 'b4', name: 'מלאי', group: 'נכסים שוטפים' },
+      { id: 'b5', name: 'רכוש קבוע, נטו', group: 'רכוש קבוע' },
+      { id: 'b6', name: 'ספקים ונותני שירותים', group: 'התחייבויות שוטפות' },
+      { id: 'b7', name: 'זכאים ויתרות זכות', group: 'התחייבויות שוטפות' },
+      { id: 'b8', name: 'הלוואות לזמן ארוך', group: 'התחייבויות לזמן ארוך' },
+      { id: 'b9', name: 'הון ויתרות בעלים', group: 'הון' },
+      { id: 'p1', name: 'הכנסות ממכירות ומשירותים', group: 'הכנסות' },
+      { id: 'p2', name: 'עלות המכירות', group: 'עלות המכירות' },
+      { id: 'p3', name: 'הוצאות שכר ונלוות', group: 'הוצאות הנהלה וכלליות' },
+      { id: 'p4', name: 'הוצאות הנהלה וכלליות', group: 'הוצאות הנהלה וכלליות' },
+      { id: 'p5', name: 'הוצאות מימון, נטו', group: 'הוצאות מימון' }
+    ],
+    accounts: [
+      { c: '1000', n: 'קופה מזומנים', v: 12450, p: 10800, note: 'b1' },
+      { c: '1010', n: 'בנק לאומי – חשבון 12345', v: 184300, p: 151200, note: 'b1' },
+      { c: '1050', n: 'לקוחות – חובות פתוחים', v: 421600, p: 372400, note: 'b2' },
+      { c: '1055', n: 'הכנסות לקבל', v: 38000, p: 26500, note: 'b2' },
+      { c: '1100', n: 'מלאי סחורות', v: 265400, p: 238000, note: 'b4' },
+      { c: '1150', n: 'הוצאות מראש', v: 14200, p: 12800, note: 'b3' },
+      { c: '1160', n: 'מקדמות מס הכנסה', v: 46800, p: 39200, note: 'b3' },
+      { c: '1170', n: 'מע״מ תשומות', v: 31500, p: 27100, note: '' },
+      { c: '1500', n: 'כלי רכב', v: 320000, p: 320000, note: 'b5' },
+      { c: '1510', n: 'פחת נצבר – כלי רכב', v: -128000, p: -96000, note: 'b5' },
+      { c: '1520', n: 'ריהוט וציוד', v: 96500, p: 88300, note: 'b5' },
+      { c: '1525', n: 'פחת נצבר – ריהוט וציוד', v: -34200, p: -27400, note: 'b5' },
+      { c: '1530', n: 'מחשבים ותוכנות', v: 58700, p: 46200, note: 'b5' },
+      { c: '1535', n: 'פחת נצבר – מחשבים', v: -29350, p: -20100, note: 'b5' },
+      { c: '2000', n: 'ספקים – חובות פתוחים', v: -368400, p: -331200, note: 'b6' },
+      { c: '2050', n: 'המחאות לפירעון', v: -84200, p: -92600, note: 'b6' },
+      { c: '2100', n: 'מוסדות – מע״מ עסקאות', v: -47900, p: -41300, note: 'b7' },
+      { c: '2110', n: 'מס הכנסה שנוכה במקור', v: -21300, p: -18700, note: 'b7' },
+      { c: '2150', n: 'עובדים ומוסדות בגין שכר', v: -63700, p: -57400, note: 'b7' },
+      { c: '2200', n: 'הוצאות לשלם', v: -29500, p: -24800, note: '' },
+      { c: '2300', n: 'הלוואה מבנק לזמן ארוך', v: -240000, p: -280000, note: 'b8' },
+      { c: '2350', n: 'הלוואות בעלים', v: -150000, p: -150000, note: 'b8' },
+      { c: '3000', n: 'הון מניות נפרע', v: -1000, p: -1000, note: 'b9' },
+      { c: '3100', n: 'עודפים לתחילת התקופה', v: -86100, p: 0, note: 'b9' },
+      { c: '3200', n: 'משיכות בעלים', v: 72000, p: 58000, note: 'b9' },
+      { c: '4000', n: 'הכנסות ממכירות', v: -2236000, p: -1974000, note: 'p1' },
+      { c: '4100', n: 'הנחות שניתנו ללקוחות', v: 18400, p: 14900, note: 'p1' },
+      { c: '4200', n: 'הכנסות אחרות', v: -12600, p: -9400, note: '' },
+      { c: '5000', n: 'קניות סחורה', v: 1240000, p: 1108000, note: 'p2' },
+      { c: '5010', n: 'מלאי פתיחה', v: 238000, p: 214000, note: 'p2' },
+      { c: '5020', n: 'מלאי סגירה', v: -265400, p: -238000, note: 'p2' },
+      { c: '6000', n: 'שכר עבודה', v: 402000, p: 361000, note: 'p3' },
+      { c: '6010', n: 'ביטוח לאומי והפרשות סוציאליות', v: 68400, p: 61200, note: 'p3' },
+      { c: '6100', n: 'שכירות ואחזקת מבנה', v: 96000, p: 90000, note: 'p4' },
+      { c: '6110', n: 'חשמל ומים', v: 18600, p: 16400, note: 'p4' },
+      { c: '6200', n: 'אחזקת רכב', v: 27400, p: 24900, note: 'p4' },
+      { c: '6250', n: 'טלפון ותקשורת', v: 9800, p: 9100, note: 'p4' },
+      { c: '6300', n: 'פחת והפחתות', v: 41600, p: 37800, note: 'p4' },
+      { c: '6400', n: 'משרדיות, ביטוח ואחרות', v: 22300, p: 19600, note: 'p4' },
+      { c: '6410', n: 'ייעוץ מקצועי ושירותים', v: 34000, p: 28500, note: '' },
+      { c: '7000', n: 'הוצאות מימון ועמלות בנק', v: 19700, p: 21300, note: 'p5' }
+    ]
+  };
+
+  CLIENTS = [
+    { name: 'כרמל מסחר והשקעות בע״מ', id: '512345678', kind: 'חברה בע״מ', last: '1-6/2026', status: 'בעריכה' },
+    { name: 'סנה שאמא – מרכזי רכב', id: '034567891', kind: 'עוסק מורשה', last: '2025 שנתי', status: 'הופק' },
+    { name: 'אלמוג הנדסה ותשתיות בע״מ', id: '514789233', kind: 'חברה בע״מ', last: '1-3/2026', status: 'הופק' },
+    { name: 'מרכז הפלדה גליל בע״מ', id: '513998214', kind: 'חברה בע״מ', last: '2025 שנתי', status: 'ממתין לקבצים' },
+    { name: 'נור לוגיסטיקה ושילוח', id: '029884411', kind: 'עוסק מורשה', last: '1-6/2026', status: 'בעריכה' },
+    { name: 'ביתן עיצוב ורהיטים בע״מ', id: '515220983', kind: 'חברה בע״מ', last: '2024 שנתי', status: 'ממתין לקבצים' }
+  ];
+
+  BS_GROUPS = ['נכסים שוטפים', 'רכוש קבוע', 'התחייבויות שוטפות', 'התחייבויות לזמן ארוך', 'הון'];
+  PL_GROUPS = ['הכנסות', 'עלות המכירות', 'הוצאות הנהלה וכלליות', 'הוצאות מימון'];
+  MONTH_NAMES = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+  ZOOMS = [{ label: 'רגיל', z: 1 }, { label: 'גדול', z: 1.15 }, { label: 'גדול מאוד', z: 1.32 }];
+  // כרטיס עודפים לתחילת התקופה — עמודת ה"מקבילה" שלו נגזרת בגלגול (effAccounts) ולא מוזנת ידנית
+  RE_OPENING_CODE = '3100';
+
+  componentDidMount() {
+    const patch = {};
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('finrep.settings') || '{}');
+      ['unit', 'showChange', 'showPrev', 'hc', 'zoomIdx'].forEach(k => { if (saved[k] !== undefined) patch[k] = saved[k]; });
+      if (saved.rules) patch.rules = saved.rules;
+    } catch (e) { /* ignore */ }
+    if (Object.keys(patch).length) this.setState(patch);
+    this._onKey = e => this.handleKey(e);
+    window.addEventListener('keydown', this._onKey);
+    this.applyZoom();
+  }
+  componentDidUpdate() { this.applyZoom(); this.persist(); this.calibratePrintPagination(); }
+  componentWillUnmount() { window.removeEventListener('keydown', this._onKey); }
+
+  rootRef = React.createRef();
+  _calibrations = 0;
+  applyZoom() {
+    const el = this.rootRef.current;
+    if (el) el.style.zoom = this.ZOOMS[this.state.zoomIdx].z;
+  }
+  calibratePrintPagination() {
+    if (this.state.screen !== 'print') return;
+    const el = this.rootRef.current;
+    if (!el) return;
+    const sheets = el.querySelectorAll('.print-sheet');
+    const FIXED_SHEETS = 4; // שער, מכתב ליווי, מאזן, רווח והפסד — עמודים בגובה קבוע שלא נכנסים לחישוב
+    const target = 1150; // תואם ל-min-height של print-sheet ב-CSS
+    let maxH = 0;
+    for (let i = FIXED_SHEETS; i < sheets.length; i++) {
+      const h = sheets[i].offsetHeight;
+      if (h > maxH) maxH = h;
+    }
+    if (!maxH) return;
+    const cur = this.state.printBudget || 900;
+    let next = cur;
+    if (maxH > target + 20) {
+      next = Math.max(300, Math.round(cur * (target / maxH)));
+    } else if (maxH < target - 150 && cur < 900) {
+      next = Math.min(900, Math.round(cur * 1.08));
+    }
+    if (next !== cur && Math.abs(next - cur) > 5 && this._calibrations < 6) {
+      this._calibrations++;
+      this.setState({ printBudget: next });
+    }
+  }
+  persist() {
+    try {
+      window.localStorage.setItem('finrep.settings', JSON.stringify({
+        unit: this.state.unit, showChange: this.state.showChange, showPrev: this.state.showPrev, hc: this.state.hc,
+        zoomIdx: this.state.zoomIdx, rules: this.state.rules
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  handleKey(e) {
+    if (this.state.screen !== 'tb') return;
+    const t = e.target || {};
+    const tag = (t.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    const vis = this.visible();
+    if (!vis.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next = Math.max(0, Math.min(vis.length - 1, this.state.cursor + (e.key === 'ArrowDown' ? 1 : -1)));
+      this.setState({ cursor: next });
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      const a = vis[Math.min(this.state.cursor, vis.length - 1)];
+      this.setState(s => {
+        const sel = Object.assign({}, s.sel);
+        if (sel[a.c]) delete sel[a.c]; else sel[a.c] = true;
+        return { sel };
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      this.setState({ drill: vis[Math.min(this.state.cursor, vis.length - 1)].c });
+    } else if (e.key === 'Escape') {
+      this.setState({ drill: null });
+    }
+  }
+
+  visible() {
+    const st = this.state, q = st.search.trim();
+    const from = st.rangeFrom.trim(), to = st.rangeTo.trim();
+    return this.effAccounts().filter(a => {
+      if (st.filter === 'un' && a.note) return false;
+      if (st.filter === 'as' && !a.note) return false;
+      if (q && a.n.indexOf(q) < 0 && a.c.indexOf(q) < 0) return false;
+      if (from && +a.c < +from) return false;
+      if (to && +a.c > +to) return false;
+      return true;
+    });
+  }
+
+  fmt(v) {
+    const u = this.state.unit;
+    let r = v, digits = 0;
+    if (u === 'thousands') r = v / 1000;
+    if (u === 'agorot') digits = 2;
+    const rounded = digits ? Math.round(r * 100) / 100 : Math.round(r);
+    if (rounded === 0) return '—';
+    const s = Math.abs(rounded).toLocaleString('he-IL', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    return rounded < 0 ? '(' + s + ')' : s;
+  }
+  pct(cur, prev) {
+    if (!prev) return '—';
+    const p = (cur - prev) / Math.abs(prev) * 100;
+    if (!isFinite(p)) return '—';
+    return (p >= 0 ? '' : '-') + Math.abs(p).toFixed(1) + '%';
+  }
+  orderedNotes() {
+    const g = this.BS_GROUPS.concat(this.PL_GROUPS);
+    return this.state.notes.slice().sort((a, b) => g.indexOf(a.group) - g.indexOf(b.group));
+  }
+  numbering() {
+    const m = {};
+    this.orderedNotes().forEach((n, i) => { m[n.id] = i + 1; });
+    return m;
+  }
+  sumNote(id, key) { return this.effAccounts().filter(a => a.note === id).reduce((s, a) => s + a[key], 0); }
+  sumGroups(gs, key) {
+    const ids = this.state.notes.filter(n => gs.indexOf(n.group) >= 0).map(n => n.id);
+    return this.effAccounts().filter(a => ids.indexOf(a.note) >= 0).reduce((s, a) => s + a[key], 0);
+  }
+  monthIndex(y, m) { return y * 12 + (m - 1); }
+  periodBounds(yearEnd) {
+    // yearEnd = השנה שבה מסתיימת התקופה (חודש toM). אם fromM > toM זו שנת כספים לא סטנדרטית
+    // שחוצה שנה קלנדרית (למשל 10/2025–09/2026), ואז fromM שייך לשנה הקודמת ל-yearEnd.
+    const wraps = this.state.fromM > this.state.toM;
+    const fromY = yearEnd - (wraps ? 1 : 0);
+    const toY = yearEnd;
+    return { fromY, toY, fromIdx: this.monthIndex(fromY, this.state.fromM), toIdx: this.monthIndex(toY, this.state.toM) };
+  }
+  inPeriod(d) {
+    if (!d) return 'out';
+    const parts = String(d).split('-');
+    const y = +parts[0], m = +parts[1];
+    if (!y || !m) return 'out';
+    const idx = this.monthIndex(y, m);
+    const cur = this.periodBounds(this.state.year);
+    if (idx >= cur.fromIdx && idx <= cur.toIdx) return 'cur';
+    const prev = this.periodBounds(this.state.year - 1);
+    if (idx >= prev.fromIdx && idx <= prev.toIdx) return 'prev';
+    return 'out';
+  }
+  adjMap() {
+    const cur = {}, prev = {};
+    this.state.journals.forEach(j => {
+      const w = this.inPeriod(j.date);
+      if (w === 'out') return;
+      const m = w === 'cur' ? cur : prev;
+      j.lines.forEach(l => {
+        if (!l.code) return;
+        const amt = (parseFloat(l.amount) || 0) * (l.side === 'C' ? -1 : 1);
+        m[l.code] = (m[l.code] || 0) + amt;
+      });
+    });
+    return { cur: cur, prev: prev };
+  }
+  effAccounts() {
+    const m = this.adjMap();
+    const list = this.state.accounts.map(a => ({
+      c: a.c, n: a.n, note: a.note, manual: !!a.manual,
+      base: a.v, basep: a.p, adj: m.cur[a.c] || 0, adjp: m.prev[a.c] || 0,
+      v: a.v + (m.cur[a.c] || 0), p: a.p + (m.prev[a.c] || 0)
+    }));
+    // גלגול עודפים (מוסכמת סימון: יתרת זכות = שלילי): יתרת פתיחה מקבילה = יתרת פתיחה נוכחית + רווח התקופה המקבילה
+    const re = list.find(a => a.c === this.RE_OPENING_CODE);
+    if (re) {
+      const plIds = this.state.notes.filter(n => this.PL_GROUPS.indexOf(n.group) >= 0).map(n => n.id);
+      const profitPrev = -list.filter(a => plIds.indexOf(a.note) >= 0).reduce((s, a) => s + a.p, 0);
+      re.p = re.v + profitPrev;
+    }
+    return list;
+  }
+  dmy(d) {
+    const p = String(d || '').split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : String(d || '');
+  }
+  periodLabel(yearEnd) {
+    const two = m => (m < 10 ? '0' + m : '' + m);
+    const b = this.periodBounds(yearEnd);
+    if (b.fromY !== b.toY) return two(this.state.fromM) + '/' + b.fromY + '–' + two(this.state.toM) + '/' + b.toY;
+    return this.state.fromM === this.state.toM ? two(this.state.fromM) + '/' + b.toY : two(this.state.fromM) + '-' + two(this.state.toM) + '/' + b.toY;
+  }
+  transactions(code) {
+    const acc = this.state.accounts.find(a => a.c === code);
+    if (!acc) return [];
+    let seed = 0;
+    for (let i = 0; i < code.length; i++) seed = seed * 31 + code.charCodeAt(i);
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.abs(seed) / 2147483648; };
+    const descs = ['חשבונית מס', 'קבלה', 'הפקדה', 'שיק', 'העברה בנקאית', 'הוצאה שוטפת', 'זיכוי', 'תנועת יומן'];
+    const n = 6 + Math.floor(rnd() * 4);
+    const rows = [];
+    let sum = 0;
+    const bounds = this.periodBounds(this.state.year);
+    const monthsSpan = bounds.toIdx - bounds.fromIdx + 1;
+    const two = x => (x < 10 ? '0' + x : '' + x);
+    const atOffset = off => {
+      const idx = bounds.fromIdx + off;
+      const y = Math.floor(idx / 12);
+      return { y, m: idx - y * 12 + 1 };
+    };
+    const push = (raw, d, my, ref, desc) => rows.push({
+      raw, key: my.y * 10000 + my.m * 100 + d,
+      date: two(d) + '/' + two(my.m) + '/' + my.y, ref, desc
+    });
+    for (let i = 0; i < n - 1; i++) {
+      const amt = Math.round(acc.v / n * (0.6 + rnd() * 0.9));
+      sum += amt;
+      push(amt, 1 + Math.floor(rnd() * 27), atOffset(Math.floor(rnd() * monthsSpan)), String(100000 + Math.floor(rnd() * 899999)), descs[Math.floor(rnd() * descs.length)]);
+    }
+    const lastMy = atOffset(monthsSpan - 1);
+    const lastDay = lastMy.m === 2 ? 28 : ([4, 6, 9, 11].indexOf(lastMy.m) >= 0 ? 30 : 31);
+    push(acc.v - sum, lastDay, lastMy, 'סגירה', 'התאמת יתרה');
+    this.state.journals.forEach((j, idx) => {
+      if (this.inPeriod(j.date) !== 'cur') return;
+      const p = String(j.date).split('-');
+      j.lines.forEach(l => {
+        if (l.code !== code) return;
+        const amt = (parseFloat(l.amount) || 0) * (l.side === 'C' ? -1 : 1);
+        push(amt, +p[2], { y: +p[0], m: +p[1] }, 'י.' + (idx + 1), 'פקודת יומן — ' + (j.desc || 'התאמה'));
+      });
+    });
+    rows.sort((a, b) => a.key - b.key);
+    let run = 0;
+    return rows.map(r => {
+      run += r.raw;
+      return {
+        date: r.date, ref: r.ref, desc: r.desc, raw: r.raw,
+        debit: r.raw > 0 ? this.fmt(r.raw) : '',
+        credit: r.raw < 0 ? this.fmt(-r.raw) : '',
+        run: this.fmt(run)
+      };
+    });
+  }
+  download(name, rows) {
+    const csv = rows.map(r => r.map(c => '"' + String(c === undefined || c === null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  renderVals() {
+    const st = this.state;
+    const numMap = this.numbering();
+    const fmt = v => this.fmt(v);
+    const client = this.CLIENTS[st.clientIdx];
+    const eff = this.effAccounts();
+
+    const prevOn = !!st.showPrev;
+    const showChangeEff = st.showChange && prevOn;
+    const chgTd = showChangeEff ? 'padding:11px 12px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;color:#8c491a;font-weight:600;width:140px' : 'display:none';
+    const chgPctTd = showChangeEff ? 'padding:11px 12px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;color:#56633f;font-weight:600;width:100px' : 'display:none';
+    const chgTh = showChangeEff ? 'text-align:left;padding:15px 12px;font-size:17px;color:#474238;width:140px' : 'display:none';
+    const chgPctTh = showChangeEff ? 'text-align:left;padding:15px 12px;font-size:17px;color:#474238;width:100px' : 'display:none';
+    const chgCell = (c, p) => ({ chg: fmt(c - p), chgPct: this.pct(c, p), chgTd, chgPctTd });
+
+    // עמודת "מקבילה" — סגנונות ל-th/td לכל טבלה; display:none כשהמתג כבוי, מציג את עמודת ההשוואה
+    const tbPrevThStyle = prevOn ? 'text-align:left;padding:15px 12px;font-size:17px;color:#474238;width:150px' : 'display:none';
+    const tbPrevTdStyle = prevOn ? 'padding:11px 12px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;color:#474238' : 'display:none';
+    const tbTotalPrevTdStyle = prevOn ? 'padding:20px 12px;text-align:left;font-size:20px;font-weight:800;border-top:3px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+    const bsPlPrevThStyle = prevOn ? 'text-align:left;padding:20px 8px 12px 8px;font-size:18px;font-weight:700;width:170px;border-bottom:2px solid #c0b6a5' : 'display:none';
+    const prevTdLiveRow = prevOn ? 'padding:11px 8px;border-bottom:1.5px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;color:#474238' : 'display:none';
+    const bsPrevTotalLiveStyle = prevOn ? 'padding:13px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+    const plPrevTotalLiveStyle = prevOn ? 'padding:15px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+    const bsFooterPrevTdLiveStyle = prevOn ? 'padding:28px 8px 12px 8px;text-align:left;font-size:22px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums' : 'display:none';
+    const pretaxPrevTdLiveStyle = bsFooterPrevTdLiveStyle;
+    const printPrevThStyle = prevOn ? 'text-align:left;padding:18px 8px 10px 8px;font-size:17px;font-weight:700;width:150px;border-bottom:2px solid #c0b6a5' : 'display:none';
+    const prevTdPrintRow = prevOn ? 'padding:9px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;color:#474238' : 'display:none';
+    const bsPrevTotalPrintStyle = prevOn ? 'padding:11px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+    const plPrevTotalPrintStyle = prevOn ? 'padding:13px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+    const bsFooterPrevTdPrintStyle = prevOn ? 'padding:24px 8px 10px 8px;text-align:left;font-size:20px;font-weight:800;border-top:4px double #201e1d;font-variant-numeric:tabular-nums' : 'display:none';
+    const pretaxPrevTdPrintStyle = bsFooterPrevTdPrintStyle;
+    const notePrevThStyle = prevOn ? 'text-align:left;padding:8px;font-size:16px;color:#645c50;width:140px;border-bottom:1.5px solid #dcd3c4' : 'display:none';
+    const notePrevTdStyle = prevOn ? 'padding:7px 8px;border-bottom:1px solid #f2ece0;text-align:left;font-variant-numeric:tabular-nums;color:#474238' : 'display:none';
+    const notePrevTotalStyle = prevOn ? 'padding:9px 8px;text-align:left;font-weight:800;border-top:2px solid #c0b6a5;font-variant-numeric:tabular-nums' : 'display:none';
+
+    const tabs = [
+      { k: 'clients', label: 'לקוחות' },
+      { k: 'files', label: 'קליטת קבצים' },
+      { k: 'tb', label: 'מאזן בוחן ומיון' },
+      { k: 'journals', label: 'פקודות יומן' },
+      { k: 'notes', label: 'ביאורים' },
+      { k: 'bs', label: 'מאזן' },
+      { k: 'pl', label: 'רווח והפסד' },
+      { k: 'print', label: 'תצוגת הדפסה' }
+    ].map(t => ({
+      label: t.label,
+      go: () => this.setState({ screen: t.k }),
+      style: 'border:2px solid;cursor:pointer;font-size:19px;font-weight:700;padding:13px 26px;border-radius:999px;' +
+        (st.screen === t.k ? 'background:#c67139;border-color:#c67139;color:#fffdf8;' : 'background:transparent;border-color:#dcd3c4;color:#474238;')
+    }));
+
+    const filters = [
+      { k: 'all', label: 'הכל' },
+      { k: 'un', label: 'לא מוינו' },
+      { k: 'as', label: 'מוינו' }
+    ].map(f => ({
+      label: f.label,
+      go: () => this.setState({ filter: f.k, cursor: 0 }),
+      style: 'border:2px solid;cursor:pointer;font-size:18px;font-weight:700;padding:12px 22px;border-radius:999px;' +
+        (st.filter === f.k ? 'background:#7a8a5e;border-color:#7a8a5e;color:#fffdf8;' : 'background:#f9f4ed;border-color:#dcd3c4;color:#474238;')
+    }));
+
+    const vis = this.visible();
+    const rows = vis.map((a, i) => {
+      const c = chgCell(a.v, a.p);
+      const cur = i === st.cursor;
+      return {
+        code: a.c, name: a.n, curr: fmt(a.v), prev: fmt(a.p), noteId: a.note, prevTd: tbPrevTdStyle,
+        checked: !!st.sel[a.c], chg: c.chg, chgPct: c.chgPct, chgTd: c.chgTd, chgPctTd: c.chgPctTd,
+        base: fmt(a.base), adj: a.adj ? fmt(a.adj) : '—',
+        adjTd: 'padding:11px 12px;border-bottom:1.5px solid #eee7db;text-align:left;font-variant-numeric:tabular-nums;font-weight:700;color:' + (a.adj ? '#8c491a' : '#a19786'),
+        trStyle: cur ? 'background:#ffe1d0;box-shadow:inset 3px 0 0 #c67139' : (st.sel[a.c] ? 'background:#f0fae1' : (a.note ? 'background:transparent' : 'background:#fff2eb')),
+        selStyle: 'width:100%;font-size:18px;font-weight:600;padding:11px 16px;border-radius:999px;background:#fffdf8;' +
+          (a.note ? 'border:2px solid #dcd3c4;' : 'border:2px solid #c67139;color:#8c491a;'),
+        toggle: () => this.setState(s => {
+          const sel = Object.assign({}, s.sel);
+          if (sel[a.c]) delete sel[a.c]; else sel[a.c] = true;
+          return { sel };
+        }),
+        drill: () => this.setState({ drill: a.c }),
+        setNote: e => {
+          const val = e.target.value;
+          this.setState(s => ({ accounts: s.accounts.map(x => x.c === a.c ? Object.assign({}, x, { note: val }) : x) }));
+        }
+      };
+    });
+
+    const selIds = Object.keys(st.sel);
+    const assignSel = id => this.setState(s => ({
+      accounts: s.accounts.map(x => s.sel[x.c] ? Object.assign({}, x, { note: id }) : x), sel: {}, bulk: ''
+    }));
+
+    const applyRules = onlyUn => this.setState(s => ({
+      accounts: s.accounts.map(a => {
+        if (onlyUn && a.note) return a;
+        const r = s.rules.find(r => r.from && r.to && +a.c >= +r.from && +a.c <= +r.to);
+        return r ? Object.assign({}, a, { note: r.noteId }) : a;
+      }),
+      templateStatus: 'כללי המיון הוחלו.'
+    }));
+
+    const noteCards = this.orderedNotes().map(n => ({
+      num: numMap[n.id], name: n.name,
+      count: eff.filter(a => a.note === n.id).length,
+      total: fmt(this.sumNote(n.id, 'v'))
+    }));
+
+    const noteRows = this.orderedNotes().map(n => ({
+      num: numMap[n.id], name: n.name, group: n.group,
+      count: eff.filter(a => a.note === n.id).length,
+      total: fmt(this.sumNote(n.id, 'v')),
+      rename: e => { const v = e.target.value; this.setState(s => ({ notes: s.notes.map(x => x.id === n.id ? Object.assign({}, x, { name: v }) : x) })); },
+      setGroup: e => { const v = e.target.value; this.setState(s => ({ notes: s.notes.map(x => x.id === n.id ? Object.assign({}, x, { group: v }) : x) })); },
+      remove: () => {
+        const affected = eff.filter(a => a.note === n.id).length;
+        const msg = affected > 0
+          ? 'למחוק את הביאור "' + n.name + '"? ' + affected + ' כרטיסים המשויכים אליו יהפכו ללא מוינים.'
+          : 'למחוק את הביאור "' + n.name + '"?';
+        if (!window.confirm(msg)) return;
+        this.setState(s => ({
+          notes: s.notes.filter(x => x.id !== n.id),
+          accounts: s.accounts.map(a => a.note === n.id ? Object.assign({}, a, { note: '' }) : a)
+        }));
+      }
+    }));
+
+    const plIds = st.notes.filter(n => this.PL_GROUPS.indexOf(n.group) >= 0).map(n => n.id);
+    const profit = -eff.filter(a => plIds.indexOf(a.note) >= 0).reduce((s, a) => s + a.v, 0);
+    const profitPrev = -eff.filter(a => plIds.indexOf(a.note) >= 0).reduce((s, a) => s + a.p, 0);
+
+    const bsDefs = [
+      { g: 'נכסים שוטפים', title: 'נכסים שוטפים', totalLabel: 'סה״כ נכסים שוטפים', sign: 1 },
+      { g: 'רכוש קבוע', title: 'רכוש קבוע', totalLabel: 'סה״כ רכוש קבוע, נטו', sign: 1 },
+      { g: 'התחייבויות שוטפות', title: 'התחייבויות שוטפות', totalLabel: 'סה״כ התחייבויות שוטפות', sign: -1 },
+      { g: 'התחייבויות לזמן ארוך', title: 'התחייבויות לזמן ארוך', totalLabel: 'סה״כ התחייבויות לזמן ארוך', sign: -1 },
+      { g: 'הון', title: 'הון', totalLabel: 'סה״כ הון', sign: -1 }
+    ];
+    const bsSections = bsDefs.map(d => {
+      const ns = this.orderedNotes().filter(n => n.group === d.g);
+      const rws = ns.map(n => {
+        const cv = this.sumNote(n.id, 'v') * d.sign, pv = this.sumNote(n.id, 'p') * d.sign;
+        const c = chgCell(cv, pv);
+        return { name: n.name, num: numMap[n.id], curr: fmt(cv), prev: fmt(pv), chg: c.chg, chgPct: c.chgPct, chgTd: c.chgTd, chgPctTd: c.chgPctTd, prevTdLive: prevTdLiveRow, prevTdPrint: prevTdPrintRow };
+      });
+      let tot = this.sumGroups([d.g], 'v') * d.sign, totP = this.sumGroups([d.g], 'p') * d.sign;
+      if (d.g === 'הון') {
+        const c = chgCell(profit, profitPrev);
+        rws.push({ name: 'רווח (הפסד) לתקופה', num: '', curr: fmt(profit), prev: fmt(profitPrev), chg: c.chg, chgPct: c.chgPct, chgTd: c.chgTd, chgPctTd: c.chgPctTd, prevTdLive: prevTdLiveRow, prevTdPrint: prevTdPrintRow });
+        tot += profit; totP += profitPrev;
+      }
+      const ct = chgCell(tot, totP);
+      return { title: d.title, rows: rws, totalLabel: d.totalLabel, total: fmt(tot), totalPrev: fmt(totP), chg: ct.chg, chgPct: ct.chgPct, chgTd: ct.chgTd, chgPctTd: ct.chgPctTd, prevTotalLive: bsPrevTotalLiveStyle, prevTotalPrint: bsPrevTotalPrintStyle };
+    });
+
+    const plDefs = [
+      { g: 'הכנסות', totalLabel: 'סה״כ הכנסות', sign: -1 },
+      { g: 'עלות המכירות', totalLabel: 'סה״כ עלות המכירות', sign: 1 },
+      { g: 'הוצאות הנהלה וכלליות', totalLabel: 'סה״כ הוצאות תפעול, הנהלה וכלליות', sign: 1 },
+      { g: 'הוצאות מימון', totalLabel: 'סה״כ הוצאות מימון, נטו', sign: 1 }
+    ];
+    const plBlocks = plDefs.map(d => {
+      const ns = this.orderedNotes().filter(n => n.group === d.g);
+      const tot = this.sumGroups([d.g], 'v') * d.sign, totP = this.sumGroups([d.g], 'p') * d.sign;
+      const ct = chgCell(tot, totP);
+      return {
+        rows: ns.map(n => {
+          const cv = this.sumNote(n.id, 'v') * d.sign, pv = this.sumNote(n.id, 'p') * d.sign;
+          const c = chgCell(cv, pv);
+          return { name: n.name, num: numMap[n.id], curr: fmt(cv), prev: fmt(pv), chg: c.chg, chgPct: c.chgPct, chgTd: c.chgTd, chgPctTd: c.chgPctTd, prevTdLive: prevTdLiveRow, prevTdPrint: prevTdPrintRow };
+        }),
+        totalLabel: d.totalLabel, total: fmt(tot), totalPrev: fmt(totP),
+        chg: ct.chg, chgPct: ct.chgPct, chgTd: ct.chgTd, chgPctTd: ct.chgPctTd,
+        prevTotalLive: plPrevTotalLiveStyle, prevTotalPrint: plPrevTotalPrintStyle
+      };
+    });
+
+    const detail = (groups, sign) => this.orderedNotes().filter(n => groups.indexOf(n.group) >= 0).map(n => {
+      const sg = typeof sign === 'function' ? sign(n) : sign;
+      return {
+        num: numMap[n.id], name: n.name,
+        rows: eff.filter(a => a.note === n.id).map(a => ({ name: a.n, curr: fmt(a.v * sg), prev: fmt(a.p * sg), prevTd: notePrevTdStyle })),
+        total: fmt(this.sumNote(n.id, 'v') * sg),
+        totalPrev: fmt(this.sumNote(n.id, 'p') * sg),
+        prevTotalStyle: notePrevTotalStyle
+      };
+    });
+
+    const detBs = detail(this.BS_GROUPS, n => (n.group === 'נכסים שוטפים' || n.group === 'רכוש קבוע') ? 1 : -1);
+    const detPl = detail(this.PL_GROUPS, n => n.group === 'הכנסות' ? -1 : 1);
+    const BUDGET = st.printBudget || 900;
+    const noteSheets = [];
+    let cs = { showGeneral: false, general: '', notes: [], h: 0 };
+    if (st.generalNote) {
+      cs.showGeneral = true; cs.general = st.generalNote;
+      cs.h = 80 + Math.ceil(st.generalNote.length / 95) * 30;
+    }
+    detBs.concat(detPl).forEach(d => {
+      const h = 125 + d.rows.length * 27;
+      if ((cs.notes.length || cs.showGeneral) && cs.h + h > BUDGET) { noteSheets.push(cs); cs = { showGeneral: false, general: '', notes: [], h: 0 }; }
+      cs.notes.push(d); cs.h += h;
+    });
+    if (cs.notes.length || cs.showGeneral) noteSheets.push(cs);
+
+    const jEntries = st.journals.map((j, i) => {
+      const w = this.inPeriod(j.date);
+      return {
+        num: i + 1, date: this.dmy(j.date), desc: j.desc,
+        badge: w === 'cur' ? 'תקופה נוכחית' : (w === 'prev' ? 'תקופה מקבילה' : 'מחוץ לטווח'),
+        rows: j.lines.map(l => {
+          const a = eff.find(x => x.c === l.code);
+          return {
+            name: (a ? a.c + ' · ' + a.n : l.code),
+            debit: l.side === 'D' ? fmt(parseFloat(l.amount) || 0) : '',
+            credit: l.side === 'C' ? fmt(parseFloat(l.amount) || 0) : ''
+          };
+        })
+      };
+    });
+    const journalSheets = [];
+    let js = { entries: [], h: 0 };
+    jEntries.forEach(e => {
+      const h = 110 + e.rows.length * 27;
+      if (js.entries.length && js.h + h > BUDGET) { journalSheets.push(js); js = { entries: [], h: 0 }; }
+      js.entries.push(e); js.h += h;
+    });
+    if (js.entries.length) journalSheets.push(js);
+
+    const totalPages = 4 + noteSheets.length + journalSheets.length;
+    noteSheets.forEach((s, i) => {
+      s.title = i === 0 ? 'ביאורים לדוחות הכספיים' : 'ביאורים לדוחות הכספיים (המשך)';
+      s.footer = 'עמוד ' + (5 + i) + ' מתוך ' + totalPages;
+    });
+    journalSheets.forEach((s, i) => {
+      s.title = i === 0 ? 'פקודות יומן התאמה' : 'פקודות יומן התאמה (המשך)';
+      s.footer = 'עמוד ' + (5 + noteSheets.length + i) + ' מתוך ' + totalPages;
+    });
+
+    const unassigned = eff.filter(a => !a.note);
+    const unSum = unassigned.reduce((s, a) => s + a.v, 0);
+    const warnOk = unassigned.length === 0;
+    const currLabel = this.periodLabel(st.year);
+    const prevLabel = this.periodLabel(st.year - 1);
+    const unitLabel = st.unit === 'thousands' ? 'באלפי שקלים חדשים' : (st.unit === 'agorot' ? 'בשקלים חדשים, כולל אגורות' : 'בשקלים חדשים');
+
+    const tbCsv = () => [(prevOn
+      ? ['כרטיס', 'שם החשבון', 'יתרה מקבצים', 'התאמות יומן', currLabel, prevLabel, 'שינוי', 'ביאור']
+      : ['כרטיס', 'שם החשבון', 'יתרה מקבצים', 'התאמות יומן', currLabel, 'ביאור'])].concat(
+      eff.map(a => {
+        const nt = st.notes.find(n => n.id === a.note);
+        const noteCol = nt ? numMap[nt.id] + '. ' + nt.name : 'לא מוין';
+        return prevOn ? [a.c, a.n, a.base, a.adj, a.v, a.p, a.v - a.p, noteCol] : [a.c, a.n, a.base, a.adj, a.v, noteCol];
+      })
+    );
+    const bsCsv = () => {
+      const out = [['מאזן ליום', (st.toM === 2 ? '28' : ([4, 6, 9, 11].indexOf(st.toM) >= 0 ? '30' : '31')) + '/' + st.toM + '/' + st.year],
+        prevOn ? ['סעיף', 'ביאור', currLabel, prevLabel] : ['סעיף', 'ביאור', currLabel]];
+      bsSections.forEach(s => {
+        out.push([s.title, '', '']);
+        s.rows.forEach(r => out.push(prevOn ? [r.name, r.num, r.curr, r.prev] : [r.name, r.num, r.curr]));
+        out.push(prevOn ? [s.totalLabel, '', s.total, s.totalPrev] : [s.totalLabel, '', s.total]);
+      });
+      return out;
+    };
+    const plCsv = () => {
+      const out = [['דוח רווח והפסד', currLabel], prevOn ? ['סעיף', 'ביאור', currLabel, prevLabel] : ['סעיף', 'ביאור', currLabel]];
+      plBlocks.forEach(b => {
+        b.rows.forEach(r => out.push(prevOn ? [r.name, r.num, r.curr, r.prev] : [r.name, r.num, r.curr]));
+        out.push(prevOn ? [b.totalLabel, '', b.total, b.totalPrev] : [b.totalLabel, '', b.total]);
+      });
+      out.push(prevOn ? ['רווח (הפסד) לפני מיסים', '', fmt(profit), fmt(profitPrev)] : ['רווח (הפסד) לפני מיסים', '', fmt(profit)]);
+      return out;
+    };
+
+    const drillAcc = st.drill ? eff.find(a => a.c === st.drill) : null;
+    const drillRows = drillAcc ? this.transactions(drillAcc.c) : [];
+    const drillDebitSum = drillRows.reduce((s, t) => s + (t.raw > 0 ? t.raw : 0), 0);
+    const drillCreditSum = drillRows.reduce((s, t) => s + (t.raw < 0 ? -t.raw : 0), 0);
+
+    return {
+      tabs, filters, rows, noteCards, noteRows, bsSections, plBlocks,
+      rootRef: this.rootRef, hcClass: st.hc ? 'hc' : '',
+      prevOn,
+      togglePrev: () => this.setState(s => ({ showPrev: !s.showPrev })),
+      prevBtnStyle: 'border:2px solid;cursor:pointer;font-size:18px;font-weight:700;padding:11px 20px;border-radius:999px;' +
+        (prevOn ? 'background:#7a8a5e;border-color:#7a8a5e;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;'),
+      prevBadgeStyle: prevOn
+        ? 'font-size:18px;font-weight:700;color:#56633f;background:#f0fae1;border:2px solid #ccdbb2;border-radius:999px;padding:9px 18px'
+        : 'font-size:18px;font-weight:700;color:#645c50;background:#f9f4ed;border:2px solid #dcd3c4;border-radius:999px;padding:9px 18px',
+      prevBadgeText: prevOn ? 'מקבילה: ' + this.periodLabel(st.year - 1) : 'ללא תקופה מקבילה',
+      tbPrevThStyle, tbTotalPrevTdStyle, bsPlPrevThStyle, printPrevThStyle, notePrevThStyle,
+      bsFooterPrevTdLiveStyle, bsFooterPrevTdPrintStyle, pretaxPrevTdLiveStyle, pretaxPrevTdPrintStyle,
+      plSubtitleTail: prevOn ? ' · לצד התקופה המקבילה ' + this.periodLabel(st.year - 1) : '',
+      comparisonClause: prevOn ? ', בהשוואה לתקופה המקבילה ' + this.periodLabel(st.year - 1) : '',
+      prevOffNote: prevOn ? '' : ' התקופה המקבילה כבויה כרגע בהגדרות (כפתור "תקופה מקבילה" למעלה) — פקודות שתאריכן שם לא יופיעו בשום דוח.',
+      noteSheets, journalSheets,
+      bookletLabel: 'חוברת הדוח הכספי · ' + totalPages + ' עמודים',
+      footer2: 'עמוד 2 מתוך ' + totalPages,
+      footer3: 'עמוד 3 מתוך ' + totalPages,
+      footer4: 'עמוד 4 מתוך ' + totalPages,
+      isClients: st.screen === 'clients', isFiles: st.screen === 'files', isTb: st.screen === 'tb',
+      isNotes: st.screen === 'notes', isBs: st.screen === 'bs', isPl: st.screen === 'pl', isPrint: st.screen === 'print',
+      isJournals: st.screen === 'journals',
+      clientName: client.name, clientId: client.id,
+      clients: this.CLIENTS.map((c, i) => ({
+        name: c.name, id: c.id, kind: c.kind, last: c.last, status: c.status,
+        open: () => this.setState({ clientIdx: i, screen: 'tb', sel: {}, cursor: 0 }),
+        style: 'background:#fffdf8;border-radius:28px;padding:26px;border:2px solid ' + (i === st.clientIdx ? '#c67139' : '#dcd3c4') + ';',
+        tagStyle: 'flex:none;font-size:16px;font-weight:700;border-radius:999px;padding:7px 16px;border:2px solid ' +
+          (c.status === 'הופק' ? '#ccdbb2;background:#f0fae1;color:#56633f;' : c.status === 'בעריכה' ? '#ffc6a5;background:#fff2eb;color:#8c491a;' : '#dcd3c4;background:#f9f4ed;color:#645c50;')
+      })),
+      months: this.MONTH_NAMES.map((m, i) => ({ v: i + 1, label: m })),
+      years: [2024, 2025, 2026],
+      year: st.year, fromM: st.fromM, toM: st.toM,
+      setYear: e => this.setState({ year: +e.target.value }),
+      setFrom: e => this.setState({ fromM: +e.target.value }),
+      setTo: e => this.setState({ toM: +e.target.value }),
+      currLabel, prevLabel, unitLabel,
+      asOfLabel: (st.toM === 2 ? '28' : ([4, 6, 9, 11].indexOf(st.toM) >= 0 ? '30' : '31')) + '/' + (st.toM < 10 ? '0' + st.toM : st.toM) + '/' + st.year,
+      unit: st.unit,
+      setUnit: e => this.setState({ unit: e.target.value }),
+      toggleChange: () => this.setState(s => ({ showChange: !s.showChange })),
+      changeBtnStyle: 'border:2px solid;cursor:pointer;font-size:18px;font-weight:700;padding:11px 20px;border-radius:999px;' +
+        (st.showChange ? 'background:#7a8a5e;border-color:#7a8a5e;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;'),
+      toggleHc: () => this.setState(s => ({ hc: !s.hc })),
+      hcBtnStyle: 'border:2px solid;cursor:pointer;font-size:18px;font-weight:700;padding:11px 20px;border-radius:999px;' +
+        (st.hc ? 'background:#201e1d;border-color:#201e1d;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;'),
+      zoomOpts: this.ZOOMS.map((z, i) => ({
+        label: z.label,
+        go: () => this.setState({ zoomIdx: i }),
+        style: 'border:2px solid;cursor:pointer;font-size:17px;font-weight:700;padding:11px 16px;border-radius:999px;' +
+          (st.zoomIdx === i ? 'background:#c67139;border-color:#c67139;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;')
+      })),
+      search: st.search,
+      setSearch: e => this.setState({ search: e.target.value, cursor: 0 }),
+      rangeFrom: st.rangeFrom, rangeTo: st.rangeTo,
+      setRangeFrom: e => this.setState({ rangeFrom: e.target.value, cursor: 0 }),
+      setRangeTo: e => this.setState({ rangeTo: e.target.value, cursor: 0 }),
+      bulk: st.bulk,
+      setBulk: e => this.setState({ bulk: e.target.value }),
+      applyBulk: () => { if (st.bulk && selIds.length) assignSel(st.bulk); },
+      clearSel: () => this.setState({ sel: {} }),
+      selCountLabel: selIds.length ? 'סומנו ' + selIds.length + ' שורות' : 'לא סומנו שורות',
+      allChecked: vis.length > 0 && vis.every(a => st.sel[a.c]),
+      toggleAll: () => this.setState(s => {
+        const all = vis.length > 0 && vis.every(a => s.sel[a.c]);
+        if (all) return { sel: {} };
+        const sel = {};
+        vis.forEach(a => { sel[a.c] = true; });
+        return { sel };
+      }),
+      chgThStyle: chgTh, chgPctThStyle: chgPctTh,
+      checkTitle: warnOk ? 'בדיקת מיון — תקין' : 'בדיקת מיון — חסר מיון',
+      checkText: warnOk
+        ? 'כל ' + eff.length + ' הסעיפים שויכו לביאור. המאזן מאוזן והדוח מוכן להפקה.'
+        : unassigned.length + ' סעיפים אינם מוינים, בסך ' + fmt(unSum) + '. הם לא ייכללו בדוחות והמאזן לא יתאזן.',
+      checkBoxStyle: 'border-radius:28px;padding:22px 24px;border:2px solid ' +
+        (warnOk ? '#ccdbb2;background:#f0fae1;color:#3d472b;' : '#ffc6a5;background:#fff2eb;color:#643312;'),
+      warnTitle: warnOk ? 'הדוח מאוזן' : 'שים לב — המאזן אינו מאוזן',
+      warnText: warnOk
+        ? 'כל הסעיפים מוינו לביאורים; סה״כ נכסים שווה לסה״כ התחייבויות והון.'
+        : unassigned.length + ' סעיפים לא מוינו (' + fmt(unSum) + ') ואינם מוצגים בדוח. מיין אותם בלשונית "מאזן בוחן ומיון" לפני הפקה.',
+      warnBoxStyle: 'border-radius:28px;padding:20px 26px;border:2px solid ' +
+        (warnOk ? '#ccdbb2;background:#f0fae1;color:#3d472b;' : '#ffc6a5;background:#fff2eb;color:#643312;'),
+      noteOptions: this.orderedNotes().map(n => ({ id: n.id, label: numMap[n.id] + '. ' + n.name })),
+      groupOptions: this.BS_GROUPS.concat(this.PL_GROUPS),
+      goNotes: () => this.setState({ screen: 'notes' }),
+      goClients: () => this.setState({ screen: 'clients' }),
+      goPrint: () => { this._calibrations = 0; this.setState({ screen: 'print', printBudget: 900 }); },
+      doPrint: () => { try { window.print(); } catch (e) { window.parent.print(); } },
+      addNote: () => this.setState(s => ({ seq: s.seq + 1, notes: s.notes.concat([{ id: 'n' + s.seq, name: 'ביאור חדש', group: 'נכסים שוטפים' }]) })),
+      ruleRows: st.rules.map(r => ({
+        from: r.from, to: r.to, noteId: r.noteId,
+        setFrom: e => { const v = e.target.value; this.setState(s => ({ rules: s.rules.map(x => x.id === r.id ? Object.assign({}, x, { from: v }) : x) })); },
+        setTo: e => { const v = e.target.value; this.setState(s => ({ rules: s.rules.map(x => x.id === r.id ? Object.assign({}, x, { to: v }) : x) })); },
+        setNote: e => { const v = e.target.value; this.setState(s => ({ rules: s.rules.map(x => x.id === r.id ? Object.assign({}, x, { noteId: v }) : x) })); },
+        remove: () => this.setState(s => ({ rules: s.rules.filter(x => x.id !== r.id) }))
+      })),
+      addRule: () => this.setState(s => ({ seq: s.seq + 1, rules: s.rules.concat([{ id: 'r' + s.seq, from: '', to: '', noteId: s.notes[0].id }]) })),
+      applyRulesUn: () => applyRules(true),
+      applyRulesAll: () => applyRules(false),
+      templateStatus: st.templateStatus,
+      saveTemplate: () => {
+        try {
+          const all = JSON.parse(window.localStorage.getItem('finrep.templates') || '{}');
+          all[client.id] = { notes: st.notes, generalNote: st.generalNote };
+          window.localStorage.setItem('finrep.templates', JSON.stringify(all));
+          this.setState({ templateStatus: 'תבנית הביאורים נשמרה עבור ' + client.name + '.' });
+        } catch (e) { this.setState({ templateStatus: 'שמירה נכשלה.' }); }
+      },
+      loadTemplate: () => {
+        try {
+          const all = JSON.parse(window.localStorage.getItem('finrep.templates') || '{}');
+          const t = all[client.id];
+          if (!t) return this.setState({ templateStatus: 'לא נמצאה תבנית שמורה ללקוח זה.' });
+          this.setState({ notes: t.notes, generalNote: t.generalNote || st.generalNote, templateStatus: 'נטענה התבנית השמורה של ' + client.name + '.' });
+        } catch (e) { this.setState({ templateStatus: 'טעינה נכשלה.' }); }
+      },
+      setDefaultTemplate: () => {
+        try {
+          window.localStorage.setItem('finrep.defaultTemplate', JSON.stringify({ notes: st.notes, generalNote: st.generalNote }));
+          this.setState({ templateStatus: 'המבנה הנוכחי נקבע כתבנית ברירת מחדל לכל תיק חדש.' });
+        } catch (e) { this.setState({ templateStatus: 'שמירה נכשלה.' }); }
+      },
+      applyDefaultTemplate: () => {
+        try {
+          const t = JSON.parse(window.localStorage.getItem('finrep.defaultTemplate') || 'null');
+          if (!t) return this.setState({ templateStatus: 'לא הוגדרה תבנית ברירת מחדל.' });
+          this.setState({ notes: t.notes, generalNote: t.generalNote || st.generalNote, templateStatus: 'תבנית ברירת המחדל הוחלה.' });
+        } catch (e) { this.setState({ templateStatus: 'טעינה נכשלה.' }); }
+      },
+      generalNote: st.generalNote,
+      setGeneralNote: e => this.setState({ generalNote: e.target.value }),
+      tbTotal: fmt(eff.reduce((s, a) => s + a.v, 0)),
+      tbTotalPrev: fmt(eff.reduce((s, a) => s + a.p, 0)),
+      bsFooterLabel: 'סה״כ נכסים = סה״כ התחייבויות והון',
+      bsFooterCurr: fmt(this.sumGroups(['נכסים שוטפים', 'רכוש קבוע'], 'v')),
+      bsFooterPrev: fmt(this.sumGroups(['נכסים שוטפים', 'רכוש קבוע'], 'p')),
+      pretaxCurr: fmt(profit), pretaxPrev: fmt(profitPrev),
+      pretaxChg: fmt(profit - profitPrev), pretaxChgPct: this.pct(profit, profitPrev),
+      pretaxChgTd: chgTd, pretaxChgPctTd: chgPctTd,
+      exportTb: () => this.download('מאזן-בוחן-' + client.id + '-' + currLabel.replace(/\//g, '-'), tbCsv()),
+      exportBs: () => this.download('מאזן-' + client.id + '-' + currLabel.replace(/\//g, '-'), bsCsv()),
+      exportPl: () => this.download('רווח-והפסד-' + client.id + '-' + currLabel.replace(/\//g, '-'), plCsv()),
+      exportAll: () => this.download('דוח-כספי-' + client.id + '-' + currLabel.replace(/\//g, '-'), bsCsv().concat([[''], ['']]).concat(plCsv()).concat([[''], ['']]).concat(tbCsv())),
+      hasDrill: !!drillAcc,
+      drillTitle: drillAcc ? 'כרטיס ' + drillAcc.c + ' — ' + drillAcc.n : '',
+      drillSub: drillAcc ? 'תנועות מקובץ BKMVDATA לתקופה ' + currLabel + ' · ' + unitLabel : '',
+      drillRows,
+      drillDebit: fmt(drillDebitSum), drillCredit: fmt(drillCreditSum),
+      drillBalance: drillAcc ? fmt(drillAcc.v) : '',
+      closeDrill: () => this.setState({ drill: null }),
+      exportDrill: () => {
+        if (!drillAcc) return;
+        this.download('כרטיס-' + drillAcc.c, [['תאריך', 'אסמכתא', 'תיאור', 'חובה', 'זכות']].concat(
+          drillRows.map(t => [t.date, t.ref, t.desc, t.raw > 0 ? t.raw : '', t.raw < 0 ? -t.raw : ''])
+        ));
+      },
+      acctOptions: eff.map(a => ({ code: a.c, label: a.c + ' · ' + a.n })),
+      jStatus: st.jStatus,
+      formDate: st.form.date, formDesc: st.form.desc,
+      setFormDate: e => { const v = e.target.value; this.setState(s => ({ form: Object.assign({}, s.form, { date: v }) })); },
+      setFormDesc: e => { const v = e.target.value; this.setState(s => ({ form: Object.assign({}, s.form, { desc: v }) })); },
+      formLines: st.form.lines.map((l, i) => ({
+        code: l.code, amount: l.amount,
+        setCode: e => { const v = e.target.value; this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.map((x, k) => k === i ? Object.assign({}, x, { code: v }) : x) }) })); },
+        setAmount: e => { const v = e.target.value; this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.map((x, k) => k === i ? Object.assign({}, x, { amount: v }) : x) }) })); },
+        setD: () => this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.map((x, k) => k === i ? Object.assign({}, x, { side: 'D' }) : x) }) })),
+        setC: () => this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.map((x, k) => k === i ? Object.assign({}, x, { side: 'C' }) : x) }) })),
+        dStyle: 'border:2px solid;cursor:pointer;font-size:17px;font-weight:700;padding:10px 20px;border-radius:999px;' + (l.side === 'D' ? 'background:#c67139;border-color:#c67139;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;'),
+        cStyle: 'border:2px solid;cursor:pointer;font-size:17px;font-weight:700;padding:10px 20px;border-radius:999px;' + (l.side === 'C' ? 'background:#7a8a5e;border-color:#7a8a5e;color:#fffdf8;' : 'background:#fffdf8;border-color:#dcd3c4;color:#474238;'),
+        remove: () => this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.length > 2 ? s.form.lines.filter((x, k) => k !== i) : s.form.lines }) }))
+      })),
+      addLine: () => this.setState(s => ({ form: Object.assign({}, s.form, { lines: s.form.lines.concat([{ code: '', amount: '', side: 'D' }]) }) })),
+      formDebit: fmt(st.form.lines.reduce((s, l) => s + (l.side === 'D' ? (parseFloat(l.amount) || 0) : 0), 0)),
+      formCredit: fmt(st.form.lines.reduce((s, l) => s + (l.side === 'C' ? (parseFloat(l.amount) || 0) : 0), 0)),
+      formDiffLabel: (function () {
+        const d = st.form.lines.reduce((s, l) => s + (l.side === 'D' ? (parseFloat(l.amount) || 0) : 0), 0);
+        const c = st.form.lines.reduce((s, l) => s + (l.side === 'C' ? (parseFloat(l.amount) || 0) : 0), 0);
+        return d === c && d > 0 ? 'הפקודה מאוזנת' : 'הפרש: ' + (Math.round(Math.abs(d - c))).toLocaleString('he-IL');
+      })(),
+      formDiffStyle: (function () {
+        const d = st.form.lines.reduce((s, l) => s + (l.side === 'D' ? (parseFloat(l.amount) || 0) : 0), 0);
+        const c = st.form.lines.reduce((s, l) => s + (l.side === 'C' ? (parseFloat(l.amount) || 0) : 0), 0);
+        const ok = d === c && d > 0;
+        return 'font-size:19px;font-weight:800;border-radius:999px;padding:11px 22px;border:2px solid ' + (ok ? '#ccdbb2;background:#f0fae1;color:#3d472b;' : '#ffc6a5;background:#fff2eb;color:#643312;');
+      })(),
+      formPeriodLabel: (function (self) {
+        const w = self.inPeriod(st.form.date);
+        return w === 'cur' ? 'ייכנס לתקופה הנוכחית ' + currLabel : (w === 'prev' ? 'ייכנס לתקופה המקבילה ' + prevLabel : 'התאריך מחוץ לתקופות הדוח — הפקודה לא תשפיע');
+      })(this),
+      editingLabel: st.editingId ? 'עריכת פקודה קיימת' : 'פקודה חדשה',
+      saveEntry: () => {
+        const lines = st.form.lines.filter(l => l.code && (parseFloat(l.amount) || 0) > 0);
+        const d = lines.reduce((s, l) => s + (l.side === 'D' ? parseFloat(l.amount) : 0), 0);
+        const c = lines.reduce((s, l) => s + (l.side === 'C' ? parseFloat(l.amount) : 0), 0);
+        if (lines.length < 2) return this.setState({ jStatus: 'נדרשות לפחות שתי שורות עם כרטיס וסכום.' });
+        if (Math.round(d * 100) !== Math.round(c * 100)) return this.setState({ jStatus: 'הפקודה אינה מאוזנת — סך החובה חייב להיות שווה לסך הזכות.' });
+        if (!st.form.date) return this.setState({ jStatus: 'חסר תאריך לפקודה.' });
+        this.setState(s => {
+          const entry = { id: s.editingId || 'j' + s.seq, date: s.form.date, desc: s.form.desc || 'פקודת התאמה', lines: lines };
+          return {
+            seq: s.seq + 1,
+            editingId: null,
+            journals: s.editingId ? s.journals.map(j => j.id === s.editingId ? entry : j) : s.journals.concat([entry]),
+            form: { date: s.form.date, desc: '', lines: [{ code: '', amount: '', side: 'D' }, { code: '', amount: '', side: 'C' }] },
+            jStatus: s.editingId ? 'הפקודה עודכנה.' : 'הפקודה נשמרה והשפיעה על היתרות.'
+          };
+        });
+      },
+      cancelEdit: () => this.setState({ editingId: null, form: { date: st.form.date, desc: '', lines: [{ code: '', amount: '', side: 'D' }, { code: '', amount: '', side: 'C' }] }, jStatus: '' }),
+      journalRows: st.journals.map((j, i) => {
+        const w = this.inPeriod(j.date);
+        const tot = j.lines.reduce((s, l) => s + (l.side === 'D' ? (parseFloat(l.amount) || 0) : 0), 0);
+        return {
+          num: i + 1, date: this.dmy(j.date), desc: j.desc, total: fmt(tot),
+          rows: j.lines.map(l => {
+            const a = eff.find(x => x.c === l.code);
+            return {
+              name: (a ? a.c + ' · ' + a.n : l.code),
+              debit: l.side === 'D' ? fmt(parseFloat(l.amount) || 0) : '',
+              credit: l.side === 'C' ? fmt(parseFloat(l.amount) || 0) : ''
+            };
+          }),
+          badge: w === 'cur' ? 'תקופה נוכחית' : (w === 'prev' ? 'תקופה מקבילה' : 'מחוץ לטווח'),
+          badgeStyle: 'font-size:16px;font-weight:700;border-radius:999px;padding:7px 16px;border:2px solid ' +
+            (w === 'cur' ? '#ffc6a5;background:#fff2eb;color:#8c491a;' : w === 'prev' ? '#ccdbb2;background:#f0fae1;color:#56633f;' : '#dcd3c4;background:#f9f4ed;color:#645c50;'),
+          edit: () => this.setState({ editingId: j.id, form: { date: j.date, desc: j.desc, lines: j.lines.map(l => Object.assign({}, l)) }, jStatus: '' }),
+          duplicate: () => this.setState(s => ({ seq: s.seq + 1, journals: s.journals.concat([{ id: 'j' + s.seq, date: j.date, desc: j.desc, lines: j.lines.map(l => Object.assign({}, l)) }]), jStatus: 'הפקודה שוכפלה.' })),
+          remove: () => {
+            if (!window.confirm('למחוק את פקודת היומן "' + (j.desc || 'ללא תיאור') + '" מתאריך ' + this.dmy(j.date) + '?')) return;
+            this.setState(s => ({ journals: s.journals.filter(x => x.id !== j.id), jStatus: 'הפקודה נמחקה.' }));
+          }
+        };
+      }),
+      journalsEmpty: st.journals.length === 0,
+      journalCountLabel: st.journals.length + ' פקודות · ' + st.journals.filter(j => this.inPeriod(j.date) === 'cur').length + ' בתקופה הנוכחית · ' + st.journals.filter(j => this.inPeriod(j.date) === 'prev').length + ' בתקופה המקבילה',
+      newAcctCode: st.newAcct.code, newAcctName: st.newAcct.name, newAcctNote: st.newAcct.note,
+      setNewAcctCode: e => { const v = e.target.value; this.setState(s => ({ newAcct: Object.assign({}, s.newAcct, { code: v }) })); },
+      setNewAcctName: e => { const v = e.target.value; this.setState(s => ({ newAcct: Object.assign({}, s.newAcct, { name: v }) })); },
+      setNewAcctNote: e => { const v = e.target.value; this.setState(s => ({ newAcct: Object.assign({}, s.newAcct, { note: v }) })); },
+      addAcct: () => {
+        const na = st.newAcct;
+        if (!na.code || !na.name) return this.setState({ jStatus: 'לכרטיס חדש נדרשים מספר ושם.' });
+        if (st.accounts.some(a => a.c === na.code)) return this.setState({ jStatus: 'מספר הכרטיס קיים כבר.' });
+        this.setState(s => ({
+          accounts: s.accounts.concat([{ c: na.code, n: na.name, v: 0, p: 0, note: na.note || '', manual: true }]),
+          newAcct: { code: '', name: '', note: '' },
+          jStatus: 'נוסף כרטיס התאמה ' + na.code + ' · ' + na.name + '.'
+        }));
+      },
+      exportJournals: () => this.download('פקודות-יומן-' + client.id, [['מס׳', 'תאריך', 'תיאור', 'כרטיס', 'שם החשבון', 'חובה', 'זכות', 'תקופה']].concat(
+        st.journals.reduce((out, j, i) => {
+          const w = this.inPeriod(j.date);
+          j.lines.forEach(l => {
+            const a = eff.find(x => x.c === l.code);
+            out.push([i + 1, this.dmy(j.date), j.desc, l.code, a ? a.n : '', l.side === 'D' ? l.amount : '', l.side === 'C' ? l.amount : '',
+              w === 'cur' ? currLabel : (w === 'prev' ? prevLabel : 'מחוץ לטווח')]);
+          });
+          return out;
+        }, [])
+      )),
+      recordTypes: [
+        { code: 'A100', desc: 'רשומת פתיחה', count: '1' },
+        { code: 'B100', desc: 'תנועה בהנהלת חשבונות', count: '18,432' },
+        { code: 'B110', desc: 'רשומת חשבון מהנהלת חשבונות', count: '41' },
+        { code: 'C100', desc: 'כותרת מסמך', count: '3,190' },
+        { code: 'D110', desc: 'שורת מסמך', count: '9,874' },
+        { code: 'Z900', desc: 'רשומת סגירה', count: '1' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
