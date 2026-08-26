@@ -22,6 +22,31 @@ interface BalanceRow {
   balance: number;
 }
 
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+// Supabase/PostgREST אוכף מגבלה של עד 1,000 שורות בתשובה, גם אם מבקשים .range() גדול יותר —
+// לכן שולפים בעמודים עד שמקבלים עמוד לא מלא (סימן שאין עוד נתונים).
+async function fetchAllAccountBalances(
+  supabase: SupabaseClient,
+  clientId: string,
+  asOf: string
+): Promise<{ rows: BalanceRow[]; error: { message: string } | null }> {
+  const PAGE_SIZE = 1000;
+  const rows: BalanceRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .rpc("account_balances_as_of", { p_client_id: clientId, p_as_of: asOf })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) return { rows, error };
+    const page = (data as BalanceRow[]) ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return { rows, error: null };
+}
+
 export default async function TrialBalancePage({
   params,
   searchParams,
@@ -47,19 +72,19 @@ export default async function TrialBalancePage({
   const currentAsOf = lastDayOfMonth(year, toM);
   const prevAsOf = lastDayOfMonth(year - 1, toM);
 
-  // Supabase/PostgREST מגביל תוצאות ל-1000 שורות כברירת מחדל — עם אלפי חשבונות זה
-  // חותך את הנתונים בשקט ומזייף את סיכומי מאזן הבוחן, לכן חובה .range() מפורש כאן.
-  const [{ data: currentBalances, error: currErr }, { data: prevBalances, error: prevErr }] =
-    await Promise.all([
-      supabase.rpc("account_balances_as_of", { p_client_id: id, p_as_of: currentAsOf }).range(0, 49999),
-      supabase.rpc("account_balances_as_of", { p_client_id: id, p_as_of: prevAsOf }).range(0, 49999),
-    ]);
+  const [
+    { rows: currentBalances, error: currErr },
+    { rows: prevBalances, error: prevErr },
+  ] = await Promise.all([
+    fetchAllAccountBalances(supabase, id, currentAsOf),
+    fetchAllAccountBalances(supabase, id, prevAsOf),
+  ]);
 
   const prevByAccount = new Map<string, number>(
-    ((prevBalances as BalanceRow[]) ?? []).map((r) => [r.account_id, r.balance])
+    prevBalances.map((r) => [r.account_id, r.balance])
   );
 
-  const rows: TbRow[] = ((currentBalances as BalanceRow[]) ?? []).map((r) => ({
+  const rows: TbRow[] = currentBalances.map((r) => ({
     accountId: r.account_id,
     code: r.code,
     name: r.name,
