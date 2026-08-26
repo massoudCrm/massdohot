@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
 import { NewClientForm } from "./new-client-form";
@@ -93,6 +94,15 @@ export default async function ClientsPage() {
                 </div>
                 <div className="mt-2 text-base" style={{ color: "var(--muted)" }}>
                   ח.פ / ע.מ {c.tax_id} · {c.kind}
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <Link
+                    href={`/clients/${c.id}/files`}
+                    className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
+                    style={{ borderColor: "var(--accent)", color: "var(--accent-text)" }}
+                  >
+                    פתח תיק
+                  </Link>
                 </div>
               </div>
             ))}
