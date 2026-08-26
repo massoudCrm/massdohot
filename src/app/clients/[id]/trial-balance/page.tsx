@@ -24,27 +24,19 @@ interface BalanceRow {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-// Supabase/PostgREST אוכף מגבלה של עד 1,000 שורות בתשובה, גם אם מבקשים .range() גדול יותר —
-// לכן שולפים בעמודים עד שמקבלים עמוד לא מלא (סימן שאין עוד נתונים).
-async function fetchAllAccountBalances(
+// account_balances_as_of מחזירה מערך JSON יחיד בתוך שורה בודדת (לא טבלת שורות), כדי לעקוף
+// את מגבלת ה-1,000 שורות שSupabase/PostgREST אוכף על תשובות מרובות-שורות, ולחשב פעם אחת בלבד.
+async function fetchAccountBalances(
   supabase: SupabaseClient,
   clientId: string,
   asOf: string
 ): Promise<{ rows: BalanceRow[]; error: { message: string } | null }> {
-  const PAGE_SIZE = 1000;
-  const rows: BalanceRow[] = [];
-  let offset = 0;
-  for (;;) {
-    const { data, error } = await supabase
-      .rpc("account_balances_as_of", { p_client_id: clientId, p_as_of: asOf })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (error) return { rows, error };
-    const page = (data as BalanceRow[]) ?? [];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
-  }
-  return { rows, error: null };
+  const { data, error } = await supabase.rpc("account_balances_as_of", {
+    p_client_id: clientId,
+    p_as_of: asOf,
+  });
+  if (error) return { rows: [], error };
+  return { rows: (data as BalanceRow[]) ?? [], error: null };
 }
 
 export default async function TrialBalancePage({
@@ -76,8 +68,8 @@ export default async function TrialBalancePage({
     { rows: currentBalances, error: currErr },
     { rows: prevBalances, error: prevErr },
   ] = await Promise.all([
-    fetchAllAccountBalances(supabase, id, currentAsOf),
-    fetchAllAccountBalances(supabase, id, prevAsOf),
+    fetchAccountBalances(supabase, id, currentAsOf),
+    fetchAccountBalances(supabase, id, prevAsOf),
   ]);
 
   const prevByAccount = new Map<string, number>(
