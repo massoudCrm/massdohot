@@ -1,30 +1,48 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export function PeriodSelector({
+  clientId,
   months,
   fromM,
   toM,
   year,
 }: {
+  clientId: string;
   months: string[];
   fromM: number;
   toM: number;
   year: number;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  // מצב מקומי, לא מבוסס על ה-props מהשרת — כי בין שינוי לשינוי (למשל חודש ואז שנה) הדף
+  // עדיין לא הספיק להיטען מחדש עם הערכים החדשים, ואם מסתמכים על ה-props הישנים כל שינוי
+  // "דורס" את קודמו בחזרה לערך הישן.
+  const [state, setState] = useState({ from: fromM, to: toM, year });
 
-  function update(patch: Partial<{ from: number; to: number; year: number }>) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("from", String(patch.from ?? fromM));
-    params.set("to", String(patch.to ?? toM));
-    params.set("year", String(patch.year ?? year));
+  async function update(patch: Partial<{ from: number; to: number; year: number }>) {
+    const next = { ...state, ...patch };
+    setState(next);
+
+    const params = new URLSearchParams();
+    params.set("from", String(next.from));
+    params.set("to", String(next.to));
+    params.set("year", String(next.year));
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("clients")
+      .update({ from_month: next.from, to_month: next.to, report_year: next.year })
+      .eq("id", clientId);
+    if (error) console.error("שמירת התקופה נכשלה:", error.message);
+
     router.push(`?${params.toString()}`);
   }
 
-  const years = [year - 2, year - 1, year, year + 1];
+  const years = [state.year - 2, state.year - 1, state.year, state.year + 1];
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-full border-2 px-4 py-2" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
@@ -32,7 +50,7 @@ export function PeriodSelector({
         תקופה
       </span>
       <select
-        value={fromM}
+        value={state.from}
         onChange={(e) => update({ from: Number(e.target.value) })}
         className="rounded-full border-2 px-3 py-1.5 text-base"
         style={{ borderColor: "var(--border)" }}
@@ -47,7 +65,7 @@ export function PeriodSelector({
         עד
       </span>
       <select
-        value={toM}
+        value={state.to}
         onChange={(e) => update({ to: Number(e.target.value) })}
         className="rounded-full border-2 px-3 py-1.5 text-base"
         style={{ borderColor: "var(--border)" }}
@@ -59,7 +77,7 @@ export function PeriodSelector({
         ))}
       </select>
       <select
-        value={year}
+        value={state.year}
         onChange={(e) => update({ year: Number(e.target.value) })}
         className="rounded-full border-2 px-3 py-1.5 text-base"
         style={{ borderColor: "var(--border)" }}

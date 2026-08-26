@@ -48,18 +48,20 @@ export default async function TrialBalancePage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const now = new Date();
-  const fromM = Number(sp.from) || 1;
-  const toM = Number(sp.to) || now.getMonth() + 1;
-  const year = Number(sp.year) || now.getFullYear();
 
   const supabase = await createClient();
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, tax_id, kind")
+    .select("id, name, tax_id, kind, from_month, to_month, report_year")
     .eq("id", id)
     .single();
   if (clientError || !client) notFound();
+
+  // ה-URL גובר אם קיים (כדי שקישור עם תקופה מסוימת יהיה ניתן לשיתוף); אחרת משתמשים
+  // בתקופה השמורה אצל הלקוח, כדי שהיא תיזכר גם כשחוזרים למאזן ממסך אחר.
+  const fromM = Number(sp.from) || client.from_month;
+  const toM = Number(sp.to) || client.to_month;
+  const year = Number(sp.year) || client.report_year;
 
   const currentAsOf = lastDayOfMonth(year, toM);
   const prevAsOf = lastDayOfMonth(year - 1, toM);
@@ -103,6 +105,13 @@ export default async function TrialBalancePage({
         </div>
         <div className="flex gap-3">
           <Link
+            href={`/clients/${id}/notes`}
+            className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
+            style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+          >
+            ביאורים
+          </Link>
+          <Link
             href={`/clients/${id}/files`}
             className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}
@@ -123,7 +132,7 @@ export default async function TrialBalancePage({
               {periodLabel(fromM, toM, year - 1)}
             </div>
           </div>
-          <PeriodSelector months={MONTH_NAMES} fromM={fromM} toM={toM} year={year} />
+          <PeriodSelector clientId={id} months={MONTH_NAMES} fromM={fromM} toM={toM} year={year} />
         </div>
 
         {(clientError || currErr || prevErr) && (
