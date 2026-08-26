@@ -99,7 +99,7 @@ export default async function ClientsPage() {
                 <div className="mt-5 flex items-center justify-end gap-3">
                   <DeleteClientButton clientId={c.id} clientName={c.name} />
                   <Link
-                    href={`/clients/${c.id}/files`}
+                    href={`/clients/${c.id}/trial-balance`}
                     className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
                     style={{ borderColor: "var(--accent)", color: "var(--accent-text)" }}
                   >

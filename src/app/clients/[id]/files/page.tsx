@@ -32,6 +32,13 @@ export default async function ClientFilesPage({
             ח.פ / ע.מ {client.tax_id} · {client.kind}
           </div>
         </div>
+        <Link
+          href={`/clients/${client.id}/trial-balance`}
+          className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
+          style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+        >
+          מאזן בוחן
+        </Link>
       </header>
 
       <main className="flex-1 px-11 py-8">

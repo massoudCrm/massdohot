@@ -86,18 +86,12 @@ export function FileIngestion({ clientId }: { clientId: string }) {
 
     const supabase = createClient();
     try {
-      // מוחקים תנועות קיימות (קליטה מחדש = החלפה מלאה, לא צבירה)
-      const { data: existingAccounts } = await supabase
-        .from("accounts")
-        .select("id")
-        .eq("client_id", clientId);
-      if (existingAccounts && existingAccounts.length > 0) {
-        const { error: delErr } = await supabase
-          .from("transactions")
-          .delete()
-          .in("account_id", existingAccounts.map((a) => a.id));
-        if (delErr) throw delErr;
-      }
+      // מוחקים תנועות קיימות (קליטה מחדש = החלפה מלאה, לא צבירה) — בפעולה אחת בצד השרת,
+      // כדי לא לשלוף אלפי מזהי חשבונות לדפדפן ולהעביר אותם ב-URL.
+      const { error: delErr } = await supabase.rpc("delete_client_transactions", {
+        p_client_id: clientId,
+      });
+      if (delErr) throw delErr;
 
       const accountRows = result.accounts.map((a) => ({
         client_id: clientId,
@@ -108,7 +102,8 @@ export function FileIngestion({ clientId }: { clientId: string }) {
       const { data: savedAccounts, error: accErr } = await supabase
         .from("accounts")
         .upsert(accountRows, { onConflict: "client_id,code" })
-        .select("id, code");
+        .select("id, code")
+        .range(0, 49999);
       if (accErr) throw accErr;
 
       const codeToId = new Map((savedAccounts ?? []).map((a) => [a.code, a.id]));
