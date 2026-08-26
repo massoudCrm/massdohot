@@ -1,26 +1,54 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5ead8;
+  --foreground: #201e1d;
+  --card: #fffdf8;
+  --border: #dcd3c4;
+  --border-soft: #eee7db;
+  --muted: #645c50;
+  --accent: #c67139;
+  --accent-hover: #b2622d;
+  --accent-soft: #ffe1d0;
+  --accent-text: #8c491a;
+  --success: #7a8a5e;
+  --success-soft: #f0fae1;
+  --success-border: #ccdbb2;
+  --success-text: #56633f;
+  --warn-soft: #fff2eb;
+  --warn-border: #ffc6a5;
+  --warn-text: #643312;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --font-sans: "Figtree", "Assistant", system-ui, sans-serif;
+  --font-display: "Caprasimo", "Assistant", sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 19px;
+}
+
+input,
+select,
+button,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
