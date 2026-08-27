@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DeleteClientButton } from "./delete-client-button";
+import { EditClientButton } from "./edit-client-button";
 import { LogoutButton } from "./logout-button";
 import { NewClientForm } from "./new-client-form";
 
@@ -98,6 +99,7 @@ export default async function ClientsPage() {
                 </div>
                 <div className="mt-5 flex items-center justify-end gap-3">
                   <DeleteClientButton clientId={c.id} clientName={c.name} />
+                  <EditClientButton clientId={c.id} name={c.name} taxId={c.tax_id} kind={c.kind} />
                   <Link
                     href={`/clients/${c.id}/trial-balance`}
                     className="rounded-full border-2 px-5 py-2.5 text-base font-bold"

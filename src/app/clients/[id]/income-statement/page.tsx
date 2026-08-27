@@ -2,8 +2,9 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, lastDayOfMonth } from "@/lib/format";
+import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
 import { fetchReportData } from "../report-shared";
+import { ChangeColumnToggle } from "../change-column-toggle";
 
 function periodLabel(fromM: number, toM: number, year: number) {
   const two = (m: number) => String(m).padStart(2, "0");
@@ -22,10 +23,11 @@ export default async function IncomeStatementPage({
   const supabase = await createClient();
 
   const [{ data: client, error: clientError }, { data: countsRaw }] = await Promise.all([
-    supabase.from("clients").select("id, from_month, to_month, report_year").eq("id", id).single(),
+    supabase.from("clients").select("id, from_month, to_month, report_year, show_changes").eq("id", id).single(),
     supabase.rpc("note_account_counts", { p_client_id: id }),
   ]);
   if (clientError || !client) notFound();
+  const showChanges = client.show_changes;
 
   const fromM = Number(sp.from) || client.from_month;
   const toM = Number(sp.to) || client.to_month;
@@ -41,13 +43,16 @@ export default async function IncomeStatementPage({
 
   return (
     <main className="flex-1 px-11 py-8">
-        <div className="mb-6">
-          <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-            רווח והפסד
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
+              רווח והפסד
+            </div>
+            <div className="mt-1.5 text-lg" style={{ color: "var(--muted)" }}>
+              לתקופה {currLabel} · מקבילה {prevLabel}
+            </div>
           </div>
-          <div className="mt-1.5 text-lg" style={{ color: "var(--muted)" }}>
-            לתקופה {currLabel} · מקבילה {prevLabel}
-          </div>
+          <ChangeColumnToggle clientId={id} showChanges={showChanges} />
         </div>
 
         {pl.error && (
@@ -88,6 +93,16 @@ export default async function IncomeStatementPage({
                 <th className="p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
                   {prevLabel}
                 </th>
+                {showChanges && (
+                  <>
+                    <th className="p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
+                      שינוי
+                    </th>
+                    <th className="p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
+                      %
+                    </th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -102,12 +117,28 @@ export default async function IncomeStatementPage({
                       <td className="p-3 text-left tabular-nums" style={{ color: "var(--muted)" }}>
                         {formatAmount(n.prev)}
                       </td>
+                      {showChanges && (
+                        <>
+                          <td className="p-3 text-left tabular-nums" style={{ color: "var(--muted)" }}>
+                            {formatAmount(n.curr - n.prev)}
+                          </td>
+                          <td className="p-3 text-left tabular-nums" style={{ color: "var(--muted)" }}>
+                            {formatPercentChange(n.curr, n.prev)}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                   <tr style={{ borderBottom: "2px solid var(--border)" }}>
                     <td className="p-3 font-bold">סה&quot;כ {g.name}</td>
                     <td className="p-3 text-left font-bold tabular-nums">{formatAmount(g.curr)}</td>
                     <td className="p-3 text-left font-bold tabular-nums">{formatAmount(g.prev)}</td>
+                    {showChanges && (
+                      <>
+                        <td className="p-3 text-left font-bold tabular-nums">{formatAmount(g.curr - g.prev)}</td>
+                        <td className="p-3 text-left font-bold tabular-nums">{formatPercentChange(g.curr, g.prev)}</td>
+                      </>
+                    )}
                   </tr>
                 </Fragment>
               ))}
@@ -117,6 +148,16 @@ export default async function IncomeStatementPage({
                 <td className="p-4 text-xl font-extrabold">רווח (הפסד) לתקופה</td>
                 <td className="p-4 text-left text-xl font-extrabold tabular-nums">{formatAmount(pl.total.curr)}</td>
                 <td className="p-4 text-left text-xl font-extrabold tabular-nums">{formatAmount(pl.total.prev)}</td>
+                {showChanges && (
+                  <>
+                    <td className="p-4 text-left text-xl font-extrabold tabular-nums">
+                      {formatAmount(pl.total.curr - pl.total.prev)}
+                    </td>
+                    <td className="p-4 text-left text-xl font-extrabold tabular-nums">
+                      {formatPercentChange(pl.total.curr, pl.total.prev)}
+                    </td>
+                  </>
+                )}
               </tr>
             </tfoot>
           </table>

@@ -1,23 +1,47 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, lastDayOfMonth } from "@/lib/format";
+import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
 import { fetchReportData, type GroupTotal } from "../report-shared";
+import { ChangeColumnToggle } from "../change-column-toggle";
 
 function periodLabel(fromM: number, toM: number, year: number) {
   const two = (m: number) => String(m).padStart(2, "0");
   return fromM === toM ? `${two(fromM)}/${year}` : `${two(fromM)}-${two(toM)}/${year}`;
 }
 
-function GroupBlock({ group, currLabel, prevLabel }: { group: GroupTotal; currLabel: string; prevLabel: string }) {
+function GroupBlock({
+  group,
+  currLabel,
+  prevLabel,
+  showChanges,
+}: {
+  group: GroupTotal;
+  currLabel: string;
+  prevLabel: string;
+  showChanges: boolean;
+}) {
   return (
     <div className="mb-5">
       <div className="text-lg font-extrabold">{group.name}</div>
       <table className="mt-2 w-full border-collapse text-lg">
+        <thead>
+          <tr className="text-sm" style={{ color: "var(--muted)" }}>
+            <td></td>
+            <td className="p-2 text-left">{currLabel}</td>
+            <td className="p-2 text-left">{prevLabel}</td>
+            {showChanges && (
+              <>
+                <td className="p-2 text-left">שינוי</td>
+                <td className="p-2 text-left">%</td>
+              </>
+            )}
+          </tr>
+        </thead>
         <tbody>
           {group.notes.length === 0 && (
             <tr>
-              <td className="p-2 text-base" style={{ color: "var(--muted)" }} colSpan={3}>
+              <td className="p-2 text-base" style={{ color: "var(--muted)" }} colSpan={showChanges ? 5 : 3}>
                 אין ביאורים בקבוצה זו.
               </td>
             </tr>
@@ -31,6 +55,16 @@ function GroupBlock({ group, currLabel, prevLabel }: { group: GroupTotal; currLa
               <td className="p-2 text-left tabular-nums" style={{ color: "var(--muted)" }}>
                 {formatAmount(n.prev)}
               </td>
+              {showChanges && (
+                <>
+                  <td className="p-2 text-left tabular-nums" style={{ color: "var(--muted)" }}>
+                    {formatAmount(n.curr - n.prev)}
+                  </td>
+                  <td className="p-2 text-left tabular-nums" style={{ color: "var(--muted)" }}>
+                    {formatPercentChange(n.curr, n.prev)}
+                  </td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>
@@ -39,16 +73,15 @@ function GroupBlock({ group, currLabel, prevLabel }: { group: GroupTotal; currLa
             <td className="p-2 font-bold">סה&quot;כ {group.name}</td>
             <td className="p-2 text-left font-bold tabular-nums">{formatAmount(group.curr)}</td>
             <td className="p-2 text-left font-bold tabular-nums">{formatAmount(group.prev)}</td>
+            {showChanges && (
+              <>
+                <td className="p-2 text-left font-bold tabular-nums">{formatAmount(group.curr - group.prev)}</td>
+                <td className="p-2 text-left font-bold tabular-nums">{formatPercentChange(group.curr, group.prev)}</td>
+              </>
+            )}
           </tr>
         </tfoot>
       </table>
-      <div className="mt-1 flex justify-between text-sm" style={{ color: "var(--muted)" }}>
-        <span></span>
-        <div className="flex gap-[3.25rem] pl-2">
-          <span>{currLabel}</span>
-          <span>{prevLabel}</span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -65,10 +98,11 @@ export default async function BalanceSheetPage({
   const supabase = await createClient();
 
   const [{ data: client, error: clientError }, { data: countsRaw }] = await Promise.all([
-    supabase.from("clients").select("id, from_month, to_month, report_year").eq("id", id).single(),
+    supabase.from("clients").select("id, from_month, to_month, report_year, show_changes").eq("id", id).single(),
     supabase.rpc("note_account_counts", { p_client_id: id }),
   ]);
   if (clientError || !client) notFound();
+  const showChanges = client.show_changes;
 
   const fromM = Number(sp.from) || client.from_month;
   const toM = Number(sp.to) || client.to_month;
@@ -99,13 +133,16 @@ export default async function BalanceSheetPage({
 
   return (
     <main className="flex-1 px-11 py-8">
-        <div className="mb-6">
-          <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-            מאזן
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
+              מאזן
+            </div>
+            <div className="mt-1.5 text-lg" style={{ color: "var(--muted)" }}>
+              ליום {currentAsOf.split("-").reverse().join("/")} · מקבילה {prevLabel}
+            </div>
           </div>
-          <div className="mt-1.5 text-lg" style={{ color: "var(--muted)" }}>
-            ליום {currentAsOf.split("-").reverse().join("/")} · מקבילה {prevLabel}
-          </div>
+          <ChangeColumnToggle clientId={id} showChanges={showChanges} />
         </div>
 
         {error && (
@@ -140,7 +177,7 @@ export default async function BalanceSheetPage({
             </div>
             <div className="mt-4">
               {assetGroups.map((g) => (
-                <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} />
+                <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
               ))}
             </div>
             <div
@@ -151,6 +188,12 @@ export default async function BalanceSheetPage({
               <div className="flex gap-8 tabular-nums">
                 <span>{formatAmount(assetsTotal.curr)}</span>
                 <span style={{ color: "var(--muted)" }}>{formatAmount(assetsTotal.prev)}</span>
+                {showChanges && (
+                  <>
+                    <span style={{ color: "var(--muted)" }}>{formatAmount(assetsTotal.curr - assetsTotal.prev)}</span>
+                    <span style={{ color: "var(--muted)" }}>{formatPercentChange(assetsTotal.curr, assetsTotal.prev)}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -161,7 +204,7 @@ export default async function BalanceSheetPage({
             </div>
             <div className="mt-4">
               {liabEquityGroups.map((g) => (
-                <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} />
+                <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
               ))}
             </div>
             <div className="mb-2 flex items-center justify-between px-2 text-base" style={{ color: "var(--muted)" }}>
@@ -169,6 +212,12 @@ export default async function BalanceSheetPage({
               <div className="flex gap-8 tabular-nums">
                 <span>{formatAmount(pl.total.curr)}</span>
                 <span>{formatAmount(pl.total.prev)}</span>
+                {showChanges && (
+                  <>
+                    <span>{formatAmount(pl.total.curr - pl.total.prev)}</span>
+                    <span>{formatPercentChange(pl.total.curr, pl.total.prev)}</span>
+                  </>
+                )}
               </div>
             </div>
             <div
@@ -179,6 +228,16 @@ export default async function BalanceSheetPage({
               <div className="flex gap-8 tabular-nums">
                 <span>{formatAmount(liabEquityTotal.curr)}</span>
                 <span style={{ color: "var(--muted)" }}>{formatAmount(liabEquityTotal.prev)}</span>
+                {showChanges && (
+                  <>
+                    <span style={{ color: "var(--muted)" }}>
+                      {formatAmount(liabEquityTotal.curr - liabEquityTotal.prev)}
+                    </span>
+                    <span style={{ color: "var(--muted)" }}>
+                      {formatPercentChange(liabEquityTotal.curr, liabEquityTotal.prev)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -1,15 +1,28 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, lastDayOfMonth } from "@/lib/format";
+import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
 import { fetchReportData, fetchNoteDetails, type GroupTotal, type NoteDetail } from "../report-shared";
 import { PrintButton } from "./print-button";
+import { ChangeColumnToggle } from "../change-column-toggle";
 
 function periodLabel(fromM: number, toM: number, year: number) {
   const two = (m: number) => String(m).padStart(2, "0");
   return fromM === toM ? `${two(fromM)}/${year}` : `${two(fromM)}-${two(toM)}/${year}`;
 }
 
-function Row({ label, curr, prev, bold }: { label: string; curr: number; prev: number; bold?: boolean }) {
+function Row({
+  label,
+  curr,
+  prev,
+  bold,
+  showChanges,
+}: {
+  label: string;
+  curr: number;
+  prev: number;
+  bold?: boolean;
+  showChanges: boolean;
+}) {
   return (
     <tr style={{ borderBottom: "1px solid #ddd" }}>
       <td className={`py-1.5 ${bold ? "font-bold" : ""}`}>{label}</td>
@@ -17,22 +30,50 @@ function Row({ label, curr, prev, bold }: { label: string; curr: number; prev: n
       <td className={`py-1.5 text-left tabular-nums ${bold ? "font-bold" : ""}`} style={{ color: "#555" }}>
         {formatAmount(prev)}
       </td>
+      {showChanges && (
+        <>
+          <td className={`py-1.5 text-left tabular-nums ${bold ? "font-bold" : ""}`} style={{ color: "#555" }}>
+            {formatAmount(curr - prev)}
+          </td>
+          <td className={`py-1.5 text-left tabular-nums ${bold ? "font-bold" : ""}`} style={{ color: "#555" }}>
+            {formatPercentChange(curr, prev)}
+          </td>
+        </>
+      )}
     </tr>
   );
 }
 
-function GroupRows({ group }: { group: GroupTotal }) {
+function GroupRows({ group, showChanges }: { group: GroupTotal; showChanges: boolean }) {
   return (
     <>
       {group.notes.map((n) => (
-        <Row key={n.id} label={`${n.name} (ביאור ${n.num})`} curr={n.curr} prev={n.prev} />
+        <Row key={n.id} label={`${n.name} (ביאור ${n.num})`} curr={n.curr} prev={n.prev} showChanges={showChanges} />
       ))}
-      <Row label={`סה"כ ${group.name}`} curr={group.curr} prev={group.prev} bold />
+      <Row label={`סה"כ ${group.name}`} curr={group.curr} prev={group.prev} bold showChanges={showChanges} />
     </>
   );
 }
 
-function NoteSection({ note, currLabel, prevLabel }: { note: NoteDetail; currLabel: string; prevLabel: string }) {
+function PageHeader({ name }: { name: string }) {
+  return (
+    <div className="mb-4 border-b-2 pb-2 text-xl font-extrabold" style={{ borderColor: "#999", color: "#000" }}>
+      {name}
+    </div>
+  );
+}
+
+function NoteSection({
+  note,
+  currLabel,
+  prevLabel,
+  showChanges,
+}: {
+  note: NoteDetail;
+  currLabel: string;
+  prevLabel: string;
+  showChanges: boolean;
+}) {
   return (
     <div className="mb-4 break-inside-avoid">
       <div className="text-base font-bold">
@@ -48,16 +89,31 @@ function NoteSection({ note, currLabel, prevLabel }: { note: NoteDetail; currLab
             <td className="text-left" style={{ color: "#555" }}>
               {prevLabel}
             </td>
+            {showChanges && (
+              <>
+                <td className="text-left" style={{ color: "#555" }}>
+                  שינוי
+                </td>
+                <td className="text-left" style={{ color: "#555" }}>
+                  %
+                </td>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
           {note.subNotes.map((sn) => (
-            <Row key={sn.id} label={sn.name} curr={sn.curr} prev={sn.prev} />
+            <Row key={sn.id} label={sn.name} curr={sn.curr} prev={sn.prev} showChanges={showChanges} />
           ))}
           {note.subNotes.length > 0 && (
-            <Row label="יתרת כרטיסים ללא תת-ביאור" curr={note.direct.curr} prev={note.direct.prev} />
+            <Row
+              label="יתרת כרטיסים ללא תת-ביאור"
+              curr={note.direct.curr}
+              prev={note.direct.prev}
+              showChanges={showChanges}
+            />
           )}
-          <Row label='סה"כ' curr={note.curr} prev={note.prev} bold />
+          <Row label='סה"כ' curr={note.curr} prev={note.prev} bold showChanges={showChanges} />
         </tbody>
       </table>
     </div>
@@ -77,10 +133,11 @@ export default async function PrintPage({
 
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, tax_id, kind, from_month, to_month, report_year, general_note")
+    .select("id, name, tax_id, kind, from_month, to_month, report_year, general_note, show_changes")
     .eq("id", id)
     .single();
   if (clientError || !client) notFound();
+  const showChanges = client.show_changes;
 
   const fromM = Number(sp.from) || client.from_month;
   const toM = Number(sp.to) || client.to_month;
@@ -116,7 +173,10 @@ export default async function PrintPage({
         <div className="text-lg" style={{ color: "var(--muted)" }}>
           תצוגה מוכנה להדפסה / שמירה כ-PDF (Ctrl+P)
         </div>
-        <PrintButton />
+        <div className="flex items-center gap-3">
+          <ChangeColumnToggle clientId={id} showChanges={showChanges} />
+          <PrintButton />
+        </div>
       </div>
 
       {error && (
@@ -142,6 +202,7 @@ export default async function PrintPage({
           className="mb-10 break-after-page"
           style={{ breakAfter: "page", pageBreakAfter: "always" }}
         >
+          <PageHeader name={client.name} />
           <div className="mb-4 text-2xl font-extrabold">מאזן</div>
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -151,13 +212,23 @@ export default async function PrintPage({
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}
                 </td>
+                {showChanges && (
+                  <>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      שינוי
+                    </td>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      %
+                    </td>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {assetGroups.map((g) => (
-                <GroupRows key={g.id} group={g} />
+                <GroupRows key={g.id} group={g} showChanges={showChanges} />
               ))}
-              <Row label='סה"כ נכסים' curr={assetsTotal.curr} prev={assetsTotal.prev} bold />
+              <Row label='סה"כ נכסים' curr={assetsTotal.curr} prev={assetsTotal.prev} bold showChanges={showChanges} />
             </tbody>
           </table>
 
@@ -169,14 +240,35 @@ export default async function PrintPage({
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}
                 </td>
+                {showChanges && (
+                  <>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      שינוי
+                    </td>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      %
+                    </td>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {liabEquityGroups.map((g) => (
-                <GroupRows key={g.id} group={g} />
+                <GroupRows key={g.id} group={g} showChanges={showChanges} />
               ))}
-              <Row label="רווח (הפסד) לתקופה — טרם שויך לעודפים" curr={pl.total.curr} prev={pl.total.prev} />
-              <Row label='סה"כ התחייבויות והון' curr={liabEquityTotal.curr} prev={liabEquityTotal.prev} bold />
+              <Row
+                label="רווח (הפסד) לתקופה — טרם שויך לעודפים"
+                curr={pl.total.curr}
+                prev={pl.total.prev}
+                showChanges={showChanges}
+              />
+              <Row
+                label='סה"כ התחייבויות והון'
+                curr={liabEquityTotal.curr}
+                prev={liabEquityTotal.prev}
+                bold
+                showChanges={showChanges}
+              />
             </tbody>
           </table>
         </section>
@@ -185,6 +277,7 @@ export default async function PrintPage({
           className="mb-10 break-after-page"
           style={{ breakAfter: "page", pageBreakAfter: "always" }}
         >
+          <PageHeader name={client.name} />
           <div className="mb-4 text-2xl font-extrabold">רווח והפסד</div>
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -194,18 +287,35 @@ export default async function PrintPage({
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}
                 </td>
+                {showChanges && (
+                  <>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      שינוי
+                    </td>
+                    <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
+                      %
+                    </td>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {pl.groups.map((g) => (
-                <GroupRows key={g.id} group={g} />
+                <GroupRows key={g.id} group={g} showChanges={showChanges} />
               ))}
-              <Row label="רווח (הפסד) לתקופה" curr={pl.total.curr} prev={pl.total.prev} bold />
+              <Row
+                label="רווח (הפסד) לתקופה"
+                curr={pl.total.curr}
+                prev={pl.total.prev}
+                bold
+                showChanges={showChanges}
+              />
             </tbody>
           </table>
         </section>
 
         <section>
+          <PageHeader name={client.name} />
           <div className="mb-4 text-2xl font-extrabold">ביאורים</div>
           {client.general_note && (
             <div className="mb-6 break-inside-avoid">
@@ -214,7 +324,7 @@ export default async function PrintPage({
             </div>
           )}
           {noteDetails.notes.map((n) => (
-            <NoteSection key={n.id} note={n} currLabel={currLabel} prevLabel={prevLabel} />
+            <NoteSection key={n.id} note={n} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
           ))}
         </section>
       </div>
