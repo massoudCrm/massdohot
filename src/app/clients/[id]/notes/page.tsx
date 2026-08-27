@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ALL_GROUPS } from "@/lib/report-groups";
 import { NotesTable } from "./notes-table";
 import { GeneralNoteEditor } from "./general-note-editor";
 import { TemplateActions } from "./template-actions";
+import { ReportGroupsPanel } from "./report-groups-panel";
 
 export default async function NotesPage({
   params,
@@ -20,8 +19,9 @@ export default async function NotesPage({
     { data: countsRaw },
     { data: subNotes },
     { data: subCountsRaw },
+    { data: groupsRaw },
   ] = await Promise.all([
-    supabase.from("clients").select("id, name, tax_id, kind, general_note").eq("id", id).single(),
+    supabase.from("clients").select("id, name, general_note").eq("id", id).single(),
     supabase.from("notes").select("id, name, group").eq("client_id", id),
     supabase.rpc("note_account_counts", { p_client_id: id }),
     supabase
@@ -30,9 +30,24 @@ export default async function NotesPage({
       .eq("notes.client_id", id)
       .order("sort_order"),
     supabase.rpc("sub_note_account_counts", { p_client_id: id }),
+    supabase
+      .from("report_groups")
+      .select("id, statement, side, name, sort_order")
+      .eq("client_id", id)
+      .order("statement")
+      .order("sort_order"),
   ]);
 
   if (clientError || !client) notFound();
+
+  const groups = (groupsRaw ?? []) as {
+    id: string;
+    statement: "bs" | "pl";
+    side: "assets" | "liabilities_equity" | null;
+    name: string;
+    sort_order: number;
+  }[];
+  const groupOrder = new Map(groups.map((g, i) => [g.name, i]));
 
   const counts = (countsRaw as Record<string, number>) ?? {};
   const subCounts = (subCountsRaw as Record<string, number>) ?? {};
@@ -42,9 +57,10 @@ export default async function NotesPage({
     list.push({ id: sn.id, name: sn.name, count: subCounts[sn.id] ?? 0 });
     subNotesByNote.set(sn.note_id, list);
   }
+  // ביאור שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה.
   const orderedNotes = (notes ?? [])
     .slice()
-    .sort((a, b) => ALL_GROUPS.indexOf(a.group) - ALL_GROUPS.indexOf(b.group));
+    .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
   const numbered = orderedNotes.map((n, i) => ({
     ...n,
     num: i + 1,
@@ -52,33 +68,13 @@ export default async function NotesPage({
     subNotes: subNotesByNote.get(n.id) ?? [],
   }));
   const unassignedCount = counts["unassigned"] ?? 0;
+  const groupNoteCounts = new Map<string, number>();
+  for (const n of notes ?? []) {
+    groupNoteCounts.set(n.group, (groupNoteCounts.get(n.group) ?? 0) + 1);
+  }
 
   return (
-    <div className="flex flex-1 flex-col" style={{ background: "var(--background)" }}>
-      <header className="flex flex-wrap items-center justify-between gap-4 px-11 pt-6">
-        <div>
-          <Link href="/" className="text-base font-semibold" style={{ color: "var(--accent-text)" }}>
-            ← חזרה לרשימת הלקוחות
-          </Link>
-          <div className="mt-2 text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-            {client.name}
-          </div>
-          <div className="text-base" style={{ color: "var(--muted)" }}>
-            ח.פ / ע.מ {client.tax_id} · {client.kind}
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href={`/clients/${id}/trial-balance`}
-            className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}
-          >
-            מאזן בוחן
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex-1 px-11 py-8">
+    <main className="flex-1 px-11 py-8">
         <div className="mb-6">
           <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
             ניהול ביאורים
@@ -108,14 +104,27 @@ export default async function NotesPage({
             clientId={id}
             clientName={client.name}
             currentNotes={(notes ?? []).map((n) => ({ name: n.name, group: n.group }))}
+            currentGroups={groups.map((g) => ({
+              statement: g.statement,
+              side: g.side,
+              name: g.name,
+              sort_order: g.sort_order,
+            }))}
             currentGeneralNote={client.general_note ?? ""}
           />
         </div>
 
-        <NotesTable clientId={id} notes={numbered} />
+        <div className="mb-6">
+          <ReportGroupsPanel
+            clientId={id}
+            groups={groups}
+            noteCounts={Object.fromEntries(groupNoteCounts)}
+          />
+        </div>
+
+        <NotesTable clientId={id} notes={numbered} groups={groups} />
 
         <GeneralNoteEditor clientId={id} initialValue={client.general_note ?? ""} />
-      </main>
-    </div>
+    </main>
   );
 }

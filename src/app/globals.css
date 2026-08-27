@@ -52,3 +52,17 @@ textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  /* flexbox על אבות-אב מונע לפעמים את שבירת העמודים הכפויה (break-after) על הצאצאים —
+     בהדפסה עצמה חוזרים לפריסת בלוקים רגילה כדי שהחלוקה לעמודים תעבוד באופן אמין. */
+  html,
+  body,
+  .print-flow {
+    display: block !important;
+    background: white !important;
+  }
+}

@@ -1,8 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { parseUniformFormat, type ParseResult } from "@/lib/uniform-format/parse";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+
+export interface YearStatus {
+  year: number;
+  txn_count: number;
+  last_uploaded_at: string;
+}
+
+const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => 2024 + i); // 2024–2032
 
 function DropZone({
   label,
@@ -55,13 +65,50 @@ function DropZone({
   );
 }
 
-export function FileIngestion({ clientId }: { clientId: string }) {
+function UploadStatusPanel({ yearsLoaded }: { yearsLoaded: YearStatus[] }) {
+  if (yearsLoaded.length === 0) {
+    return (
+      <div className="mb-6 rounded-2xl border-2 p-5 text-base" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+        עדיין לא נטענו נתונים ללקוח זה — זו הפעם הראשונה.
+      </div>
+    );
+  }
+  return (
+    <div
+      className="mb-6 rounded-2xl border-2 p-5 text-base"
+      style={{ borderColor: "var(--success-border)", background: "var(--success-soft)", color: "var(--success-text)" }}
+    >
+      <div className="font-bold">כבר נטענו נתונים ללקוח זה:</div>
+      <div className="mt-2 flex flex-wrap gap-3">
+        {yearsLoaded.map((y) => (
+          <span key={y.year} className="rounded-full border-2 px-4 py-1.5 font-bold" style={{ borderColor: "var(--success-border)", background: "var(--card)" }}>
+            {y.year} · {y.txn_count.toLocaleString("he-IL")} תנועות · נטען {new Date(y.last_uploaded_at).toLocaleDateString("he-IL")}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function FileIngestion({
+  clientId,
+  defaultYear,
+  yearsLoaded,
+}: {
+  clientId: string;
+  defaultYear: number;
+  yearsLoaded: YearStatus[];
+}) {
+  const router = useRouter();
   const [iniFile, setIniFile] = useState<File | null>(null);
   const [bkmvFile, setBkmvFile] = useState<File | null>(null);
+  const [year, setYear] = useState(defaultYear);
   const [result, setResult] = useState<ParseResult | null>(null);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+
+  const existingYear = yearsLoaded.find((y) => y.year === year);
 
   async function handleParse() {
     if (!iniFile || !bkmvFile) return;
@@ -86,29 +133,31 @@ export function FileIngestion({ clientId }: { clientId: string }) {
 
     const supabase = createClient();
     try {
-      // מוחקים תנועות קיימות (קליטה מחדש = החלפה מלאה, לא צבירה) — בפעולה אחת בצד השרת,
-      // כדי לא לשלוף אלפי מזהי חשבונות לדפדפן ולהעביר אותם ב-URL.
-      const { error: delErr } = await supabase.rpc("delete_client_transactions", {
+      // מוחקים רק תנועות של שנת הדוח שנבחרה — שנים אחרות שכבר נטענו ללקוח נשארות ללא פגע.
+      const { error: delErr } = await supabase.rpc("delete_client_transactions_for_year", {
         p_client_id: clientId,
+        p_year: year,
       });
       if (delErr) throw delErr;
 
+      // יתרת פתיחה מתעדכנת בשרת רק אם התאריך החדש מוקדם-או-שווה לזה שכבר שמור, כדי שהעוגן
+      // תמיד יישאר הנקודה המוקדמת ביותר שיש לנו נתונים עליה (ראו migration 0015).
+      const openingDate = `${year}-01-01`;
       const accountRows = result.accounts.map((a) => ({
-        client_id: clientId,
         code: a.code,
         name: a.name,
         opening_balance: a.openingBalance,
+        opening_date: openingDate,
         source_group_code: a.sourceGroupCode || null,
         source_group_desc: a.sourceGroupDesc || null,
       }));
-      const { data: savedAccounts, error: accErr } = await supabase
-        .from("accounts")
-        .upsert(accountRows, { onConflict: "client_id,code" })
-        .select("id, code")
-        .range(0, 49999);
+      const { data: savedAccounts, error: accErr } = await supabase.rpc("upsert_accounts_with_opening_balance", {
+        p_client_id: clientId,
+        p_accounts: accountRows,
+      });
       if (accErr) throw accErr;
 
-      const codeToId = new Map((savedAccounts ?? []).map((a) => [a.code, a.id]));
+      const codeToId = new Map((savedAccounts ?? []).map((a: { id: string; code: string }) => [a.code, a.id]));
       const txnRows = result.transactions
         .map((t) => {
           const accountId = codeToId.get(t.accountCode);
@@ -131,9 +180,8 @@ export function FileIngestion({ clientId }: { clientId: string }) {
         if (txnErr) throw txnErr;
       }
 
-      setStatus(
-        `נקלטו בהצלחה ${accountRows.length} חשבונות ו-${txnRows.length} תנועות.`
-      );
+      setStatus(`נקלטו בהצלחה ${accountRows.length} חשבונות ו-${txnRows.length} תנועות לשנת ${year}.`);
+      router.refresh();
     } catch (e) {
       setStatus("שמירה נכשלה: " + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -142,116 +190,148 @@ export function FileIngestion({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="rounded-[28px] border-2 p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-        <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-          הקבצים
-        </div>
-        <div className="mt-5 flex flex-col gap-4">
-          <DropZone
-            label="INI.TXT"
-            hint="רשומת סיכום ומספרי רשומות"
-            file={iniFile}
-            onFile={setIniFile}
-          />
-          <DropZone
-            label="BKMVDATA.TXT"
-            hint="חשבונות ותנועות הנהלת חשבונות"
-            file={bkmvFile}
-            onFile={setBkmvFile}
-          />
-          <button
-            disabled={!iniFile || !bkmvFile || parsing}
-            onClick={handleParse}
-            className="rounded-full py-3.5 text-lg font-bold text-white disabled:opacity-50"
-            style={{ background: "var(--accent)" }}
-          >
-            {parsing ? "מעבד…" : "חלץ נתונים מהקבצים"}
-          </button>
-        </div>
+    <div className="max-w-5xl">
+      <UploadStatusPanel yearsLoaded={yearsLoaded} />
+
+      <div className="mb-6 flex items-center gap-3 rounded-2xl border-2 p-5" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+        <label className="text-lg font-bold">שנת הדוח שמעלים:</label>
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="w-32 rounded-full border-2 px-4 py-2 text-lg font-bold tabular-nums"
+          style={{ borderColor: "var(--accent)", background: "var(--card)", color: "var(--accent-text)" }}
+        >
+          {YEAR_OPTIONS.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+        {existingYear && (
+          <span className="text-base font-semibold" style={{ color: "var(--warn-text)" }}>
+            שים לב: שנת {year} כבר טעונה ({existingYear.txn_count.toLocaleString("he-IL")} תנועות) — קליטה חדשה תחליף אותה.
+          </span>
+        )}
       </div>
 
-      <div className="rounded-[28px] border-2 p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-        <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-          רשומות שזוהו
-        </div>
-        {!result && (
-          <div className="mt-5 text-lg" style={{ color: "var(--muted)" }}>
-            עדיין לא חולצו נתונים.
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-[28px] border-2 p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
+            הקבצים
           </div>
-        )}
-        {result && (
-          <>
-            <table className="mt-5 w-full border-collapse text-lg">
-              <thead>
-                <tr style={{ background: "var(--background)" }}>
-                  <th className="p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
-                    קוד
-                  </th>
-                  <th className="p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
-                    תיאור
-                  </th>
-                  <th className="p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
-                    כמות
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.recordTypeCounts.map((rc) => (
-                  <tr key={rc.code} style={{ borderBottom: "1.5px solid var(--border-soft)" }}>
-                    <td className="p-3 font-mono font-bold">{rc.code}</td>
-                    <td className="p-3">{rc.description}</td>
-                    <td className="p-3 text-left font-semibold">{rc.count.toLocaleString("he-IL")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {result.errors.length > 0 && (
-              <div
-                className="mt-5 rounded-2xl border-2 p-4 text-base"
-                style={{ borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }}
-              >
-                <b>שגיאות — לא ניתן לקלוט:</b>
-                <ul className="mt-2 list-inside list-disc">
-                  {result.errors.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {result.warnings.length > 0 && (
-              <div
-                className="mt-5 rounded-2xl border-2 p-4 text-base"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--muted)" }}
-              >
-                <b>אזהרות:</b>
-                <ul className="mt-2 list-inside list-disc">
-                  {result.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="mt-5 text-lg">
-              נמצאו <b>{result.accounts.length}</b> חשבונות ו-<b>{result.transactions.length}</b> תנועות עבור{" "}
-              <b>{result.businessName}</b> (ח.פ {result.vatId}).
-            </div>
-
+          <div className="mt-5 flex flex-col gap-4">
+            <DropZone label="INI.TXT" hint="רשומת סיכום ומספרי רשומות" file={iniFile} onFile={setIniFile} />
+            <DropZone label="BKMVDATA.TXT" hint="חשבונות ותנועות הנהלת חשבונות" file={bkmvFile} onFile={setBkmvFile} />
             <button
-              disabled={result.errors.length > 0 || saving}
-              onClick={handleSave}
-              className="mt-5 w-full rounded-full py-3.5 text-lg font-bold text-white disabled:opacity-50"
-              style={{ background: "var(--success)" }}
+              disabled={!iniFile || !bkmvFile || parsing}
+              onClick={handleParse}
+              className="rounded-full py-3.5 text-lg font-bold text-white disabled:opacity-50"
+              style={{ background: "var(--accent)" }}
             >
-              {saving ? "קולט…" : "קליטה לדאטהבייס"}
+              {parsing ? "מעבד…" : "חלץ נתונים מהקבצים"}
             </button>
-          </>
-        )}
+          </div>
+        </div>
 
-        {status && <div className="mt-4 text-base font-semibold">{status}</div>}
+        <div className="rounded-[28px] border-2 p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
+            רשומות שזוהו
+          </div>
+          {!result && (
+            <div className="mt-5 text-lg" style={{ color: "var(--muted)" }}>
+              עדיין לא חולצו נתונים.
+            </div>
+          )}
+          {result && (
+            <>
+              <table className="mt-5 w-full border-collapse text-lg">
+                <thead>
+                  <tr style={{ background: "var(--background)" }}>
+                    <th className="p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
+                      קוד
+                    </th>
+                    <th className="p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
+                      תיאור
+                    </th>
+                    <th className="p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
+                      כמות
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.recordTypeCounts.map((rc) => (
+                    <tr key={rc.code} style={{ borderBottom: "1.5px solid var(--border-soft)" }}>
+                      <td className="p-3 font-mono font-bold">{rc.code}</td>
+                      <td className="p-3">{rc.description}</td>
+                      <td className="p-3 text-left font-semibold">{rc.count.toLocaleString("he-IL")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {result.errors.length > 0 && (
+                <div
+                  className="mt-5 rounded-2xl border-2 p-4 text-base"
+                  style={{ borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }}
+                >
+                  <b>שגיאות — לא ניתן לקלוט:</b>
+                  <ul className="mt-2 list-inside list-disc">
+                    {result.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.warnings.length > 0 && (
+                <div
+                  className="mt-5 rounded-2xl border-2 p-4 text-base"
+                  style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--muted)" }}
+                >
+                  <b>אזהרות:</b>
+                  <ul className="mt-2 list-inside list-disc">
+                    {result.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="mt-5 text-lg">
+                נמצאו <b>{result.accounts.length}</b> חשבונות ו-<b>{result.transactions.length}</b> תנועות עבור{" "}
+                <b>{result.businessName}</b> (ח.פ {result.vatId}).
+              </div>
+
+              {existingYear ? (
+                <ConfirmDeleteButton
+                  label={`קליטה לדאטהבייס — שנת ${year}`}
+                  title="החלפת נתוני שנה קיימת"
+                  message={`שנת ${year} כבר טעונה עם ${existingYear.txn_count.toLocaleString(
+                    "he-IL"
+                  )} תנועות (נטענה לאחרונה ${new Date(existingYear.last_uploaded_at).toLocaleDateString(
+                    "he-IL"
+                  )}). קליטה זו תמחק את התנועות הקיימות לשנת ${year} ותחליף אותן בקובץ החדש. שנים אחרות לא ייפגעו.`}
+                  confirmLabel="כן, החלף"
+                  confirmBusyLabel="קולט…"
+                  onConfirm={handleSave}
+                  className="mt-5 w-full rounded-full py-3.5 text-center text-lg font-bold text-white"
+                  style={{ background: "var(--success)" }}
+                />
+              ) : (
+                <button
+                  disabled={result.errors.length > 0 || saving}
+                  onClick={handleSave}
+                  className="mt-5 w-full rounded-full py-3.5 text-lg font-bold text-white disabled:opacity-50"
+                  style={{ background: "var(--success)" }}
+                >
+                  {saving ? "קולט…" : `קליטה לדאטהבייס — שנת ${year}`}
+                </button>
+              )}
+            </>
+          )}
+
+          {status && <div className="mt-4 text-base font-semibold">{status}</div>}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { lastDayOfMonth } from "@/lib/format";
-import { ALL_GROUPS } from "@/lib/report-groups";
 import { PeriodSelector } from "./period-selector";
 import { TrialBalanceTable, type TbRow } from "./trial-balance-table";
 import { SortRulesPanel, type SortRule } from "./sort-rules-panel";
@@ -58,7 +57,7 @@ export default async function TrialBalancePage({
   const supabase = await createClient();
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("id, name, tax_id, kind, from_month, to_month, report_year")
+    .select("id, from_month, to_month, report_year")
     .eq("id", id)
     .single();
   if (clientError || !client) notFound();
@@ -79,6 +78,7 @@ export default async function TrialBalancePage({
     { data: sortRules },
     { data: sourceGroups },
     { data: subNotesRaw },
+    { data: groupsRaw },
   ] = await Promise.all([
     fetchAccountBalances(supabase, id, currentAsOf),
     fetchAccountBalances(supabase, id, prevAsOf),
@@ -93,15 +93,18 @@ export default async function TrialBalancePage({
       .select("id, note_id, name, sort_order, notes!inner(client_id)")
       .eq("notes.client_id", id)
       .order("sort_order"),
+    supabase.from("report_groups").select("name").eq("client_id", id).order("statement").order("sort_order"),
   ]);
 
   const prevByAccount = new Map<string, number>(
     prevBalances.map((r) => [r.account_id, r.balance])
   );
 
+  // ביאור שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה.
+  const groupOrder = new Map((groupsRaw ?? []).map((g, i) => [g.name, i]));
   const orderedNotes = (notesRaw ?? [])
     .slice()
-    .sort((a, b) => ALL_GROUPS.indexOf(a.group) - ALL_GROUPS.indexOf(b.group));
+    .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
   const subNotesByNote = new Map<string, { id: string; noteId: string; label: string }[]>();
   for (const sn of subNotesRaw ?? []) {
     const list = subNotesByNote.get(sn.note_id) ?? [];
@@ -131,37 +134,7 @@ export default async function TrialBalancePage({
   const unassignedCount = rows.filter((r) => !r.noteId).length;
 
   return (
-    <div className="flex flex-1 flex-col" style={{ background: "var(--background)" }}>
-      <header className="flex flex-wrap items-center justify-between gap-4 px-11 pt-6">
-        <div>
-          <Link href="/" className="text-base font-semibold" style={{ color: "var(--accent-text)" }}>
-            ← חזרה לרשימת הלקוחות
-          </Link>
-          <div className="mt-2 text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-            {client.name}
-          </div>
-          <div className="text-base" style={{ color: "var(--muted)" }}>
-            ח.פ / ע.מ {client.tax_id} · {client.kind}
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href={`/clients/${id}/notes`}
-            className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}
-          >
-            ביאורים
-          </Link>
-          <Link
-            href={`/clients/${id}/files`}
-            className="rounded-full border-2 px-5 py-2.5 text-base font-bold"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}
-          >
-            קליטת קבצים
-          </Link>
-        </div>
-      </header>
-
+    <>
       <main className="flex-1 px-11 py-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -247,6 +220,6 @@ export default async function TrialBalancePage({
           </div>
         )}
       </main>
-    </div>
+    </>
   );
 }

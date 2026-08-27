@@ -3,8 +3,8 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ALL_GROUPS } from "@/lib/report-groups";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import type { ReportGroup } from "./report-groups-panel";
 
 interface SubNoteRow {
   id: string;
@@ -30,6 +30,7 @@ function NoteEditorModal({
   setName,
   group,
   setGroup,
+  groups,
   onSave,
   saving,
   error,
@@ -42,6 +43,7 @@ function NoteEditorModal({
   setName: (v: string) => void;
   group: string;
   setGroup: (v: string) => void;
+  groups: ReportGroup[];
   onSave: () => void;
   saving: boolean;
   error: string;
@@ -86,11 +88,24 @@ function NoteEditorModal({
             className="rounded-full border-2 px-5 py-3 text-lg"
             style={{ borderColor: "var(--border)", background: "var(--background)" }}
           >
-            {ALL_GROUPS.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
+            <optgroup label="מאזן">
+              {groups
+                .filter((g) => g.statement === "bs")
+                .map((g) => (
+                  <option key={g.id} value={g.name}>
+                    {g.name}
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="רווח והפסד">
+              {groups
+                .filter((g) => g.statement === "pl")
+                .map((g) => (
+                  <option key={g.id} value={g.name}>
+                    {g.name}
+                  </option>
+                ))}
+            </optgroup>
           </select>
         </div>
 
@@ -123,10 +138,18 @@ function NoteEditorModal({
   );
 }
 
-function AddNoteButton({ clientId, onAdded }: { clientId: string; onAdded: () => void }) {
+function AddNoteButton({
+  clientId,
+  groups,
+  onAdded,
+}: {
+  clientId: string;
+  groups: ReportGroup[];
+  onAdded: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [group, setGroup] = useState(ALL_GROUPS[0]);
+  const [group, setGroup] = useState(groups[0]?.name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -148,7 +171,7 @@ function AddNoteButton({ clientId, onAdded }: { clientId: string; onAdded: () =>
     }
     setOpen(false);
     setName("");
-    setGroup(ALL_GROUPS[0]);
+    setGroup(groups[0]?.name ?? "");
     onAdded();
   }
 
@@ -169,6 +192,7 @@ function AddNoteButton({ clientId, onAdded }: { clientId: string; onAdded: () =>
         setName={setName}
         group={group}
         setGroup={setGroup}
+        groups={groups}
         onSave={save}
         saving={saving}
         error={error}
@@ -178,7 +202,7 @@ function AddNoteButton({ clientId, onAdded }: { clientId: string; onAdded: () =>
   );
 }
 
-function EditNoteButton({ note, onSaved }: { note: NoteRow; onSaved: () => void }) {
+function EditNoteButton({ note, groups, onSaved }: { note: NoteRow; groups: ReportGroup[]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(note.name);
   const [group, setGroup] = useState(note.group);
@@ -220,6 +244,7 @@ function EditNoteButton({ note, onSaved }: { note: NoteRow; onSaved: () => void 
         setName={setName}
         group={group}
         setGroup={setGroup}
+        groups={groups}
         onSave={save}
         saving={saving}
         error={error}
@@ -437,7 +462,15 @@ function SubNotesSection({ note, onChanged }: { note: NoteRow; onChanged: () => 
   );
 }
 
-export function NotesTable({ clientId, notes }: { clientId: string; notes: NoteRow[] }) {
+export function NotesTable({
+  clientId,
+  notes,
+  groups,
+}: {
+  clientId: string;
+  notes: NoteRow[];
+  groups: ReportGroup[];
+}) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -465,7 +498,7 @@ export function NotesTable({ clientId, notes }: { clientId: string; notes: NoteR
         <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
           ביאורים
         </div>
-        <AddNoteButton clientId={clientId} onAdded={() => router.refresh()} />
+        <AddNoteButton clientId={clientId} groups={groups} onAdded={() => router.refresh()} />
       </div>
 
       {notes.length === 0 && (
@@ -510,7 +543,7 @@ export function NotesTable({ clientId, notes }: { clientId: string; notes: NoteR
                       >
                         {expanded.has(n.id) ? "▲" : "▼"} תתי-ביאורים ({n.subNotes.length})
                       </button>
-                      <EditNoteButton note={n} onSaved={() => router.refresh()} />
+                      <EditNoteButton note={n} groups={groups} onSaved={() => router.refresh()} />
                       <ConfirmDeleteButton
                         title="מחיקת ביאור"
                         message={

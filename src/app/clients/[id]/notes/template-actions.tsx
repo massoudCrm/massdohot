@@ -10,9 +10,17 @@ interface NoteSnapshotItem {
   group: string;
 }
 
+interface GroupSnapshotItem {
+  statement: "bs" | "pl";
+  side: "assets" | "liabilities_equity" | null;
+  name: string;
+  sort_order: number;
+}
+
 async function replaceNotesWithSnapshot(
   clientId: string,
-  snapshot: NoteSnapshotItem[],
+  notesSnapshot: NoteSnapshotItem[],
+  groupsSnapshot: GroupSnapshotItem[],
   generalNote: string
 ) {
   const supabase = createClient();
@@ -20,11 +28,27 @@ async function replaceNotesWithSnapshot(
   const { error: delErr } = await supabase.from("notes").delete().eq("client_id", clientId);
   if (delErr) throw new Error(delErr.message);
 
-  if (snapshot.length > 0) {
+  if (notesSnapshot.length > 0) {
     const { error: insErr } = await supabase
       .from("notes")
-      .insert(snapshot.map((n) => ({ client_id: clientId, name: n.name, group: n.group })));
+      .insert(notesSnapshot.map((n) => ({ client_id: clientId, name: n.name, group: n.group })));
     if (insErr) throw new Error(insErr.message);
+  }
+
+  // מבנה קבוצות הדוח (מאזן/רו"ה) הוא חלק מהתבנית — טעינת תבנית מחליפה גם אותו, לא רק את הביאורים.
+  if (groupsSnapshot.length > 0) {
+    const { error: delGroupsErr } = await supabase.from("report_groups").delete().eq("client_id", clientId);
+    if (delGroupsErr) throw new Error(delGroupsErr.message);
+    const { error: insGroupsErr } = await supabase.from("report_groups").insert(
+      groupsSnapshot.map((g) => ({
+        client_id: clientId,
+        statement: g.statement,
+        side: g.side,
+        name: g.name,
+        sort_order: g.sort_order,
+      }))
+    );
+    if (insGroupsErr) throw new Error(insGroupsErr.message);
   }
 
   const { error: noteErr } = await supabase
@@ -38,11 +62,13 @@ export function TemplateActions({
   clientId,
   clientName,
   currentNotes,
+  currentGroups,
   currentGeneralNote,
 }: {
   clientId: string;
   clientName: string;
   currentNotes: NoteSnapshotItem[];
+  currentGroups: GroupSnapshotItem[];
   currentGeneralNote: string;
 }) {
   const router = useRouter();
@@ -59,6 +85,7 @@ export function TemplateActions({
         client_id: clientId,
         name: `תבנית ${clientName}`,
         notes_snapshot: currentNotes,
+        groups_snapshot: currentGroups,
         general_note: currentGeneralNote,
         is_default: false,
       });
@@ -78,7 +105,7 @@ export function TemplateActions({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("note_templates")
-        .select("notes_snapshot, general_note")
+        .select("notes_snapshot, groups_snapshot, general_note")
         .eq("client_id", clientId)
         .eq("is_default", false)
         .maybeSingle();
@@ -87,7 +114,12 @@ export function TemplateActions({
         setStatus("לא נמצאה תבנית שמורה ללקוח זה.");
         return;
       }
-      await replaceNotesWithSnapshot(clientId, data.notes_snapshot as NoteSnapshotItem[], data.general_note ?? "");
+      await replaceNotesWithSnapshot(
+        clientId,
+        data.notes_snapshot as NoteSnapshotItem[],
+        (data.groups_snapshot as GroupSnapshotItem[]) ?? [],
+        data.general_note ?? ""
+      );
       setStatus(`נטענה התבנית השמורה של ${clientName}.`);
       router.refresh();
     } catch (e) {
@@ -107,6 +139,7 @@ export function TemplateActions({
         client_id: null,
         name: "ברירת מחדל",
         notes_snapshot: currentNotes,
+        groups_snapshot: currentGroups,
         general_note: currentGeneralNote,
         is_default: true,
       });
@@ -126,7 +159,7 @@ export function TemplateActions({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("note_templates")
-        .select("notes_snapshot, general_note")
+        .select("notes_snapshot, groups_snapshot, general_note")
         .eq("is_default", true)
         .maybeSingle();
       if (error) throw error;
@@ -134,7 +167,12 @@ export function TemplateActions({
         setStatus("לא הוגדרה תבנית ברירת מחדל.");
         return;
       }
-      await replaceNotesWithSnapshot(clientId, data.notes_snapshot as NoteSnapshotItem[], data.general_note ?? "");
+      await replaceNotesWithSnapshot(
+        clientId,
+        data.notes_snapshot as NoteSnapshotItem[],
+        (data.groups_snapshot as GroupSnapshotItem[]) ?? [],
+        data.general_note ?? ""
+      );
       setStatus("תבנית ברירת המחדל הוחלה.");
       router.refresh();
     } catch (e) {
