@@ -13,6 +13,8 @@ export interface ParsedAccount {
   code: string;
   name: string;
   openingBalance: number; // חתום: חיובי = יתרת חובה, שלילי = יתרת זכות (שדה 1414)
+  sourceGroupCode: string; // "קוד מאזן בוחן" מהקובץ (שדה 1405) — קיבוץ שכבר קיים בתוכנת ההנה"ח
+  sourceGroupDesc: string; // "תיאור קוד מאזן בוחן" (שדה 1406)
 }
 
 export interface ParsedTransaction {
@@ -119,6 +121,8 @@ export function parseUniformFormat(
         code: accCode,
         name: trimAlpha(rec.accountName) || accCode,
         openingBalance: parseSignedAmount(rec.openingBalance),
+        sourceGroupCode: trimAlpha(rec.trialBalanceCode),
+        sourceGroupDesc: trimAlpha(rec.trialBalanceCodeDesc),
       });
     } else if (code === "B100") {
       const rec = sliceFields(line, B100_FIELDS);

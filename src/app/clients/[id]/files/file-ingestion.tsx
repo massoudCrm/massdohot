@@ -98,6 +98,8 @@ export function FileIngestion({ clientId }: { clientId: string }) {
         code: a.code,
         name: a.name,
         opening_balance: a.openingBalance,
+        source_group_code: a.sourceGroupCode || null,
+        source_group_desc: a.sourceGroupDesc || null,
       }));
       const { data: savedAccounts, error: accErr } = await supabase
         .from("accounts")

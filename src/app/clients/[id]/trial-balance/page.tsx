@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { lastDayOfMonth } from "@/lib/format";
+import { ALL_GROUPS } from "@/lib/report-groups";
 import { PeriodSelector } from "./period-selector";
 import { TrialBalanceTable, type TbRow } from "./trial-balance-table";
+import { SortRulesPanel, type SortRule } from "./sort-rules-panel";
 
 const MONTH_NAMES = [
   "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
@@ -19,6 +21,10 @@ interface BalanceRow {
   account_id: string;
   code: string;
   name: string;
+  note_id: string | null;
+  sub_note_id: string | null;
+  source_group_code: string | null;
+  source_group_desc: string | null;
   balance: number;
 }
 
@@ -69,25 +75,60 @@ export default async function TrialBalancePage({
   const [
     { rows: currentBalances, error: currErr },
     { rows: prevBalances, error: prevErr },
+    { data: notesRaw, error: notesErr },
+    { data: sortRules },
+    { data: sourceGroups },
+    { data: subNotesRaw },
   ] = await Promise.all([
     fetchAccountBalances(supabase, id, currentAsOf),
     fetchAccountBalances(supabase, id, prevAsOf),
+    supabase.from("notes").select("id, name, group").eq("client_id", id),
+    supabase
+      .from("sort_rules")
+      .select("id, from_code, to_code, note_id, sub_note_id, source_group_code")
+      .eq("client_id", id),
+    supabase.rpc("distinct_source_groups", { p_client_id: id }),
+    supabase
+      .from("sub_notes")
+      .select("id, note_id, name, sort_order, notes!inner(client_id)")
+      .eq("notes.client_id", id)
+      .order("sort_order"),
   ]);
 
   const prevByAccount = new Map<string, number>(
     prevBalances.map((r) => [r.account_id, r.balance])
   );
 
+  const orderedNotes = (notesRaw ?? [])
+    .slice()
+    .sort((a, b) => ALL_GROUPS.indexOf(a.group) - ALL_GROUPS.indexOf(b.group));
+  const subNotesByNote = new Map<string, { id: string; noteId: string; label: string }[]>();
+  for (const sn of subNotesRaw ?? []) {
+    const list = subNotesByNote.get(sn.note_id) ?? [];
+    list.push({ id: sn.id, noteId: sn.note_id, label: sn.name });
+    subNotesByNote.set(sn.note_id, list);
+  }
+  const noteOptions = orderedNotes.map((n, i) => ({
+    id: n.id,
+    label: `${i + 1}. ${n.name}`,
+    subNotes: subNotesByNote.get(n.id) ?? [],
+  }));
+
   const rows: TbRow[] = currentBalances.map((r) => ({
     accountId: r.account_id,
     code: r.code,
     name: r.name,
+    noteId: r.note_id,
+    subNoteId: r.sub_note_id,
+    sourceGroupCode: r.source_group_code,
+    sourceGroupDesc: r.source_group_desc,
     curr: r.balance,
     prev: prevByAccount.get(r.account_id) ?? 0,
   }));
 
   const totalCurr = rows.reduce((s, r) => s + r.curr, 0);
   const totalPrev = rows.reduce((s, r) => s + r.prev, 0);
+  const unassignedCount = rows.filter((r) => !r.noteId).length;
 
   return (
     <div className="flex flex-1 flex-col" style={{ background: "var(--background)" }}>
@@ -157,14 +198,53 @@ export default async function TrialBalancePage({
           </div>
         )}
 
+        {notesErr && (
+          <div
+            className="mb-4 rounded-2xl border-2 p-4 text-base"
+            style={{ borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }}
+          >
+            שגיאה בטעינת הביאורים: {notesErr.message}
+          </div>
+        )}
+
         {rows.length > 0 && (
-          <TrialBalanceTable
-            rows={rows}
-            currLabel={periodLabel(fromM, toM, year)}
-            prevLabel={periodLabel(fromM, toM, year - 1)}
-            totalCurr={totalCurr}
-            totalPrev={totalPrev}
-          />
+          <div
+            className="mb-6 rounded-[28px] border-2 p-6"
+            style={
+              unassignedCount === 0
+                ? { borderColor: "var(--success-border)", background: "var(--success-soft)", color: "#3d472b" }
+                : { borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }
+            }
+          >
+            <div className="text-xl font-extrabold">
+              {unassignedCount === 0 ? "בדיקת מיון — תקין" : "בדיקת מיון — חסר מיון"}
+            </div>
+            <div className="mt-1.5 text-base leading-relaxed">
+              {unassignedCount === 0
+                ? `כל ${rows.length.toLocaleString("he-IL")} הסעיפים שויכו לביאור.`
+                : `${unassignedCount.toLocaleString("he-IL")} סעיפים אינם מוינים. הם לא ייכללו בדוחות עד שישויכו לביאור.`}
+            </div>
+          </div>
+        )}
+
+        {rows.length > 0 && (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <TrialBalanceTable
+              clientId={id}
+              rows={rows}
+              notes={noteOptions}
+              currLabel={periodLabel(fromM, toM, year)}
+              prevLabel={periodLabel(fromM, toM, year - 1)}
+              totalCurr={totalCurr}
+              totalPrev={totalPrev}
+            />
+            <SortRulesPanel
+              clientId={id}
+              rules={(sortRules as SortRule[]) ?? []}
+              notes={noteOptions}
+              sourceGroups={(sourceGroups as { code: string; desc: string; count: number }[]) ?? []}
+            />
+          </div>
         )}
       </main>
     </div>

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ALL_GROUPS } from "@/lib/report-groups";
 import { NotesTable } from "./notes-table";
 import { GeneralNoteEditor } from "./general-note-editor";
+import { TemplateActions } from "./template-actions";
 
 export default async function NotesPage({
   params,
@@ -13,16 +14,34 @@ export default async function NotesPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: client, error: clientError }, { data: notes, error: notesError }, { data: countsRaw }] =
-    await Promise.all([
-      supabase.from("clients").select("id, name, tax_id, kind, general_note").eq("id", id).single(),
-      supabase.from("notes").select("id, name, group").eq("client_id", id),
-      supabase.rpc("note_account_counts", { p_client_id: id }),
-    ]);
+  const [
+    { data: client, error: clientError },
+    { data: notes, error: notesError },
+    { data: countsRaw },
+    { data: subNotes },
+    { data: subCountsRaw },
+  ] = await Promise.all([
+    supabase.from("clients").select("id, name, tax_id, kind, general_note").eq("id", id).single(),
+    supabase.from("notes").select("id, name, group").eq("client_id", id),
+    supabase.rpc("note_account_counts", { p_client_id: id }),
+    supabase
+      .from("sub_notes")
+      .select("id, note_id, name, sort_order, notes!inner(client_id)")
+      .eq("notes.client_id", id)
+      .order("sort_order"),
+    supabase.rpc("sub_note_account_counts", { p_client_id: id }),
+  ]);
 
   if (clientError || !client) notFound();
 
   const counts = (countsRaw as Record<string, number>) ?? {};
+  const subCounts = (subCountsRaw as Record<string, number>) ?? {};
+  const subNotesByNote = new Map<string, { id: string; name: string; count: number }[]>();
+  for (const sn of subNotes ?? []) {
+    const list = subNotesByNote.get(sn.note_id) ?? [];
+    list.push({ id: sn.id, name: sn.name, count: subCounts[sn.id] ?? 0 });
+    subNotesByNote.set(sn.note_id, list);
+  }
   const orderedNotes = (notes ?? [])
     .slice()
     .sort((a, b) => ALL_GROUPS.indexOf(a.group) - ALL_GROUPS.indexOf(b.group));
@@ -30,6 +49,7 @@ export default async function NotesPage({
     ...n,
     num: i + 1,
     count: counts[n.id] ?? 0,
+    subNotes: subNotesByNote.get(n.id) ?? [],
   }));
   const unassignedCount = counts["unassigned"] ?? 0;
 
@@ -82,6 +102,15 @@ export default async function NotesPage({
             שגיאה בטעינת הביאורים: {notesError.message}
           </div>
         )}
+
+        <div className="mb-6">
+          <TemplateActions
+            clientId={id}
+            clientName={client.name}
+            currentNotes={(notes ?? []).map((n) => ({ name: n.name, group: n.group }))}
+            currentGeneralNote={client.general_note ?? ""}
+          />
+        </div>
 
         <NotesTable clientId={id} notes={numbered} />
 

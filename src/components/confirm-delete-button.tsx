@@ -11,6 +11,8 @@ export function ConfirmDeleteButton({
   onConfirm,
   className,
   style,
+  confirmLabel = "כן, מחק",
+  confirmBusyLabel = "מוחק…",
 }: {
   label?: string;
   title: string;
@@ -18,6 +20,9 @@ export function ConfirmDeleteButton({
   onConfirm: () => Promise<void> | void;
   className?: string;
   style?: CSSProperties;
+  /** טקסט כפתור האישור, לשימוש גם בפעולות הרסניות שאינן מחיקה (למשל "טעינת תבנית" שמחליפה ביאורים קיימים) */
+  confirmLabel?: string;
+  confirmBusyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,7 +80,7 @@ export function ConfirmDeleteButton({
                 className="flex-1 rounded-full py-3 text-lg font-bold text-white disabled:opacity-60"
                 style={{ background: "var(--accent-hover)" }}
               >
-                {busy ? "מוחק…" : "כן, מחק"}
+                {busy ? confirmBusyLabel : confirmLabel}
               </button>
               <button
                 onClick={() => setOpen(false)}

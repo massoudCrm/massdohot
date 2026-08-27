@@ -6,6 +6,15 @@ export function formatAmount(value: number): string {
   return rounded < 0 ? `(${abs})` : abs;
 }
 
+// שדה "קוד מאזן בוחן" בקובץ האחיד מוגדר אלפאנומרי, אבל בפועל תוכנות רבות ממלאות אותו
+// באפסים מובילים (כמו שדה נומרי) — למשל "000000000000011" במקום "11". לצורך תצוגה בלבד
+// מנקים את האפסים המובילים; הערך הגולמי נשאר כמו שהוא לצורך התאמה מדויקת בכללי מיון.
+export function formatSourceGroupCode(code: string): string {
+  const trimmed = code.trim();
+  const stripped = trimmed.replace(/^0+(?=.)/, "");
+  return stripped || trimmed;
+}
+
 export function lastDayOfMonth(year: number, month: number): string {
   // יום 0 של החודש הבא = היום האחרון של החודש הנוכחי
   const d = new Date(Date.UTC(year, month, 0));
