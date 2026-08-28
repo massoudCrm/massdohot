@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
-import { fetchReportData, type GroupTotal } from "../report-shared";
+import { formatAmount, formatPercentChange, firstDayOfMonth, lastDayOfMonth } from "@/lib/format";
+import { fetchPeriodData, buildReportData, type GroupTotal } from "../report-shared";
 import { ChangeColumnToggle } from "../change-column-toggle";
 
 function periodLabel(fromM: number, toM: number, year: number) {
@@ -42,14 +42,15 @@ function GroupBlock({
           {group.notes.length === 0 && (
             <tr>
               <td className="p-2 text-base" style={{ color: "var(--muted)" }} colSpan={showChanges ? 5 : 3}>
-                אין ביאורים בקבוצה זו.
+                אין סעיפים בקבוצה זו.
               </td>
             </tr>
           )}
           {group.notes.map((n) => (
             <tr key={n.id} style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <td className="p-2">
-                {n.name} <span style={{ color: "var(--muted)" }}>(ביאור {n.num})</span>
+                {n.name}
+                {n.num !== null && <span style={{ color: "var(--muted)" }}> (ביאור {n.num})</span>}
               </td>
               <td className="p-2 text-left tabular-nums">{formatAmount(n.curr)}</td>
               <td className="p-2 text-left tabular-nums" style={{ color: "var(--muted)" }}>
@@ -111,11 +112,12 @@ export default async function BalanceSheetPage({
   const prevAsOf = lastDayOfMonth(year - 1, toM);
   const currLabel = periodLabel(fromM, toM, year);
   const prevLabel = periodLabel(fromM, toM, year - 1);
+  const currentPeriod = { from: firstDayOfMonth(year, fromM), to: currentAsOf };
+  const prevPeriod = { from: firstDayOfMonth(year - 1, fromM), to: prevAsOf };
 
-  const [bs, pl] = await Promise.all([
-    fetchReportData(supabase, id, currentAsOf, prevAsOf, "bs"),
-    fetchReportData(supabase, id, currentAsOf, prevAsOf, "pl"),
-  ]);
+  const periodData = await fetchPeriodData(supabase, id, currentPeriod, prevPeriod);
+  const bs = buildReportData(periodData, "bs");
+  const pl = buildReportData(periodData, "pl");
 
   const counts = (countsRaw as Record<string, number>) ?? {};
   const unassignedCount = counts["unassigned"] ?? 0;
@@ -129,7 +131,7 @@ export default async function BalanceSheetPage({
   };
   const liabEquityTotal = { curr: liabEquityBase.curr + pl.total.curr, prev: liabEquityBase.prev + pl.total.prev };
 
-  const error = bs.error || pl.error;
+  const error = periodData.error;
 
   return (
     <main className="flex-1 px-11 py-8">

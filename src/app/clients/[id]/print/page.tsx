@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
-import { fetchReportData, fetchNoteDetails, type GroupTotal, type NoteDetail } from "../report-shared";
+import { formatAmount, formatPercentChange, firstDayOfMonth, lastDayOfMonth } from "@/lib/format";
+import { fetchPeriodData, buildReportData, buildNoteDetails, type GroupTotal, type NoteDetail } from "../report-shared";
 import { PrintButton } from "./print-button";
 import { ChangeColumnToggle } from "../change-column-toggle";
 
@@ -48,7 +48,13 @@ function GroupRows({ group, showChanges }: { group: GroupTotal; showChanges: boo
   return (
     <>
       {group.notes.map((n) => (
-        <Row key={n.id} label={`${n.name} (ביאור ${n.num})`} curr={n.curr} prev={n.prev} showChanges={showChanges} />
+        <Row
+          key={n.id}
+          label={n.num !== null ? `${n.name} (ביאור ${n.num})` : n.name}
+          curr={n.curr}
+          prev={n.prev}
+          showChanges={showChanges}
+        />
       ))}
       <Row label={`סה"כ ${group.name}`} curr={group.curr} prev={group.prev} bold showChanges={showChanges} />
     </>
@@ -146,12 +152,13 @@ export default async function PrintPage({
   const prevAsOf = lastDayOfMonth(year - 1, toM);
   const currLabel = periodLabel(fromM, toM, year);
   const prevLabel = periodLabel(fromM, toM, year - 1);
+  const currentPeriod = { from: firstDayOfMonth(year, fromM), to: currentAsOf };
+  const prevPeriod = { from: firstDayOfMonth(year - 1, fromM), to: prevAsOf };
 
-  const [bs, pl, noteDetails] = await Promise.all([
-    fetchReportData(supabase, id, currentAsOf, prevAsOf, "bs"),
-    fetchReportData(supabase, id, currentAsOf, prevAsOf, "pl"),
-    fetchNoteDetails(supabase, id, currentAsOf, prevAsOf),
-  ]);
+  const periodData = await fetchPeriodData(supabase, id, currentPeriod, prevPeriod);
+  const bs = buildReportData(periodData, "bs");
+  const pl = buildReportData(periodData, "pl");
+  const noteDetails = { notes: buildNoteDetails(periodData) };
 
   const assetGroups = bs.groups.filter((g) => g.side === "assets");
   const liabEquityGroups = bs.groups.filter((g) => g.side === "liabilities_equity");
@@ -165,7 +172,7 @@ export default async function PrintPage({
   };
   const liabEquityTotal = { curr: liabEquityBase.curr + pl.total.curr, prev: liabEquityBase.prev + pl.total.prev };
 
-  const error = bs.error || pl.error || noteDetails.error;
+  const error = periodData.error;
 
   return (
     <div style={{ background: "var(--background)" }}>
@@ -323,9 +330,11 @@ export default async function PrintPage({
               <div className="mt-1 whitespace-pre-wrap text-sm">{client.general_note}</div>
             </div>
           )}
-          {noteDetails.notes.map((n) => (
-            <NoteSection key={n.id} note={n} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
-          ))}
+          {noteDetails.notes
+            .filter((n) => n.num !== null)
+            .map((n) => (
+              <NoteSection key={n.id} note={n} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
+            ))}
         </section>
       </div>
     </div>

@@ -5,10 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { parseUniformFormat, type ParseResult } from "@/lib/uniform-format/parse";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { describeError, formatAmount } from "@/lib/format";
 
 export interface YearStatus {
   year: number;
   txn_count: number;
+  total_debit: number;
+  total_credit: number;
+  net_total_debit: number;
+  net_total_credit: number;
   last_uploaded_at: string;
 }
 
@@ -81,10 +86,34 @@ function UploadStatusPanel({ yearsLoaded }: { yearsLoaded: YearStatus[] }) {
       <div className="font-bold">כבר נטענו נתונים ללקוח זה:</div>
       <div className="mt-2 flex flex-wrap gap-3">
         {yearsLoaded.map((y) => (
-          <span key={y.year} className="rounded-full border-2 px-4 py-1.5 font-bold" style={{ borderColor: "var(--success-border)", background: "var(--card)" }}>
+          <span
+            key={y.year}
+            className="rounded-full border-2 px-4 py-1.5 font-bold"
+            style={{ borderColor: "var(--success-border)", background: "var(--card)" }}
+          >
             {y.year} · {y.txn_count.toLocaleString("he-IL")} תנועות · נטען {new Date(y.last_uploaded_at).toLocaleDateString("he-IL")}
           </span>
         ))}
+      </div>
+      <div className="mt-3 text-sm">
+        <b>בדיקת יתרות — לפי אותה שיטה כמו &quot;סה&quot;כ לדו&quot;ח&quot; בדוח מאזן הבוחן שלכם (השוו ישירות):</b>
+        <div className="mt-1 flex flex-wrap gap-3">
+          {yearsLoaded.map((y) => (
+            <span key={y.year} className="tabular-nums">
+              {y.year}: חובה {formatAmount(y.net_total_debit)} · זכות {formatAmount(y.net_total_credit)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 text-sm">
+        <b>בדיקה נוספת — סה&quot;כ תנועות גולמי בפועל (רגישה יותר לתנועה בודדת שאבדה, לא ניתן להשוואה ישירה מול הדוח):</b>
+        <div className="mt-1 flex flex-wrap gap-3">
+          {yearsLoaded.map((y) => (
+            <span key={y.year} className="tabular-nums">
+              {y.year}: חובה {formatAmount(y.total_debit)} · זכות {formatAmount(y.total_credit)}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -120,7 +149,7 @@ export function FileIngestion({
       setResult(parsed);
     } catch (e) {
       setResult(null);
-      setStatus("שגיאה בעיבוד הקבצים: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("שגיאה בעיבוד הקבצים: " + describeError(e));
     } finally {
       setParsing(false);
     }
@@ -183,7 +212,7 @@ export function FileIngestion({
       setStatus(`נקלטו בהצלחה ${accountRows.length} חשבונות ו-${txnRows.length} תנועות לשנת ${year}.`);
       router.refresh();
     } catch (e) {
-      setStatus("שמירה נכשלה: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("שמירה נכשלה: " + describeError(e));
     } finally {
       setSaving(false);
     }
@@ -300,6 +329,18 @@ export function FileIngestion({
               <div className="mt-5 text-lg">
                 נמצאו <b>{result.accounts.length}</b> חשבונות ו-<b>{result.transactions.length}</b> תנועות עבור{" "}
                 <b>{result.businessName}</b> (ח.פ {result.vatId}).
+              </div>
+
+              <div
+                className="mt-3 rounded-2xl border-2 p-4 text-base"
+                style={{ borderColor: "var(--border)", background: "var(--background)" }}
+              >
+                <b>סה&quot;כ תנועות בקובץ</b> (השוו מול &quot;סה&quot;כ לדו&quot;ח&quot; בדוח מאזן הבוחן המקורי — אמור
+                תמיד להיות מאוזן):
+                <div className="mt-1 tabular-nums">
+                  חובה {formatAmount(result.transactions.reduce((s, t) => s + t.debit, 0))} · זכות{" "}
+                  {formatAmount(result.transactions.reduce((s, t) => s + t.credit, 0))}
+                </div>
               </div>
 
               {existingYear ? (

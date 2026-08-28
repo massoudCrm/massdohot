@@ -4,6 +4,7 @@ import { NotesTable } from "./notes-table";
 import { GeneralNoteEditor } from "./general-note-editor";
 import { TemplateActions } from "./template-actions";
 import { ReportGroupsPanel } from "./report-groups-panel";
+import { orderNotesAndNumber } from "../report-shared";
 
 export default async function NotesPage({
   params,
@@ -22,7 +23,7 @@ export default async function NotesPage({
     { data: groupsRaw },
   ] = await Promise.all([
     supabase.from("clients").select("id, name, general_note").eq("id", id).single(),
-    supabase.from("notes").select("id, name, group").eq("client_id", id),
+    supabase.from("notes").select("id, name, group, has_note").eq("client_id", id),
     supabase.rpc("note_account_counts", { p_client_id: id }),
     supabase
       .from("sub_notes")
@@ -47,7 +48,6 @@ export default async function NotesPage({
     name: string;
     sort_order: number;
   }[];
-  const groupOrder = new Map(groups.map((g, i) => [g.name, i]));
 
   const counts = (countsRaw as Record<string, number>) ?? {};
   const subCounts = (subCountsRaw as Record<string, number>) ?? {};
@@ -57,13 +57,12 @@ export default async function NotesPage({
     list.push({ id: sn.id, name: sn.name, count: subCounts[sn.id] ?? 0 });
     subNotesByNote.set(sn.note_id, list);
   }
-  // ביאור שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה.
-  const orderedNotes = (notes ?? [])
-    .slice()
-    .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
-  const numbered = orderedNotes.map((n, i) => ({
+  // סעיף שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה. מספור
+  // "ביאור N" חל רק על סעיפים שסומנו has_note (ראו report-shared.ts).
+  const { ordered: orderedNotes, noteNum } = orderNotesAndNumber(notes ?? [], groups);
+  const numbered = orderedNotes.map((n) => ({
     ...n,
-    num: i + 1,
+    num: noteNum.get(n.id) ?? null,
     count: counts[n.id] ?? 0,
     subNotes: subNotesByNote.get(n.id) ?? [],
   }));
@@ -77,14 +76,15 @@ export default async function NotesPage({
     <main className="flex-1 px-11 py-8">
         <div className="mb-6">
           <div className="text-3xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-            ניהול ביאורים
+            ניהול סעיפי הדוח
           </div>
           <div className="mt-1.5 text-lg" style={{ color: "var(--muted)" }}>
-            ערוך שם ביאור, שנה את הקבוצה שבה הוא מוצג בדוח, או הוסף ביאור חדש.
+            כל סעיף מופיע בגוף המאזן/רווח והפסד; רק סעיף שתסמן במפורש כ"ביאור" יקבל מספר ביאור
+            ויופיע גם ברשימת הביאורים המפורטת.
             {unassignedCount > 0 && (
               <span style={{ color: "var(--accent-text)" }}>
                 {" "}
-                · {unassignedCount.toLocaleString("he-IL")} חשבונות עדיין ללא ביאור.
+                · {unassignedCount.toLocaleString("he-IL")} חשבונות עדיין ללא סעיף.
               </span>
             )}
           </div>
@@ -95,7 +95,7 @@ export default async function NotesPage({
             className="mb-6 rounded-2xl border-2 p-5 text-lg"
             style={{ borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }}
           >
-            שגיאה בטעינת הביאורים: {notesError.message}
+            שגיאה בטעינת הסעיפים: {notesError.message}
           </div>
         )}
 
@@ -103,7 +103,7 @@ export default async function NotesPage({
           <TemplateActions
             clientId={id}
             clientName={client.name}
-            currentNotes={(notes ?? []).map((n) => ({ name: n.name, group: n.group }))}
+            currentNotes={(notes ?? []).map((n) => ({ name: n.name, group: n.group, has_note: n.has_note }))}
             currentGroups={groups.map((g) => ({
               statement: g.statement,
               side: g.side,

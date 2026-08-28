@@ -42,7 +42,10 @@ export function PeriodSelector({
     router.push(`?${params.toString()}`);
   }
 
-  const years = [state.year - 2, state.year - 1, state.year, state.year + 1];
+  // טווח קבוע 2024–2032 (כמו בבורר שנת הדוח בקליטת קבצים), עם הגנה שהשנה הנוכחית תמיד
+  // מופיעה גם אם היא איכשהו מחוץ לטווח.
+  const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => 2024 + i);
+  const years = YEAR_OPTIONS.includes(state.year) ? YEAR_OPTIONS : [state.year, ...YEAR_OPTIONS].sort((a, b) => a - b);
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-full border-2 px-4 py-2" style={{ borderColor: "var(--border)", background: "var(--card)" }}>

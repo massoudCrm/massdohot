@@ -25,6 +25,25 @@ export function formatPercentChange(curr: number, prev: number): string {
   return pct < 0 ? `(${abs}%)` : `${abs}%`;
 }
 
+// שגיאות מ-Supabase (RPC/insert/delete) הן אובייקט רגיל (message/details/hint/code), לא
+// Error — String(e) עליהן נותן "[object Object]" חסר תועלת, אז שולפים את השדות הרלוונטיים.
+export function describeError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts = [obj.message, obj.details, obj.hint, obj.code].filter(
+      (v): v is string => typeof v === "string" && v.length > 0
+    );
+    if (parts.length > 0) return parts.join(" · ");
+    try {
+      return JSON.stringify(e);
+    } catch {
+      // נופל דרך לfallback הבא
+    }
+  }
+  return String(e);
+}
+
 export function lastDayOfMonth(year: number, month: number): string {
   // יום 0 של החודש הבא = היום האחרון של החודש הנוכחי
   const d = new Date(Date.UTC(year, month, 0));
@@ -32,4 +51,8 @@ export function lastDayOfMonth(year: number, month: number): string {
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+export function firstDayOfMonth(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
 }

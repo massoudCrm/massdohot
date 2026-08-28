@@ -319,12 +319,22 @@ export function TrialBalanceTable({
           <tfoot>
             <tr style={{ borderTop: "3px solid var(--border)" }}>
               <td colSpan={4} className="p-4 text-xl font-extrabold">
-                סה&quot;כ מאזן בוחן (חובה = זכות)
+                סה&quot;כ מאזן בוחן
               </td>
               <td className="p-4 text-left text-xl font-extrabold tabular-nums">{formatAmount(totalCurr)}</td>
               <td className="p-4 text-left text-xl font-extrabold tabular-nums">{formatAmount(totalPrev)}</td>
               <td></td>
             </tr>
+            {(Math.round(totalCurr) !== 0 || Math.round(totalPrev) !== 0) && (
+              <tr>
+                <td colSpan={7} className="px-4 pb-3 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+                  ההפרש מהאיפוס אינו טעות בחישוב — הוא נובע מפעילות רווח והפסד של שנים קודמות
+                  שטרם &quot;נסגרה&quot; בהנהלת החשבונות. סעיפי רווח והפסד מוצגים כאן לפי תנועת התקופה
+                  הנבחרת בלבד, בעוד סעיפי מאזן מצטברים מאז תחילת הנתונים — לבדיקת איזון אמיתית
+                  ולנתוני רווח והפסד מדויקים, ראו את מסכי &quot;מאזן&quot; ו&quot;רווח והפסד&quot;.
+                </td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>

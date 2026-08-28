@@ -2,8 +2,8 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatAmount, formatPercentChange, lastDayOfMonth } from "@/lib/format";
-import { fetchReportData } from "../report-shared";
+import { formatAmount, formatPercentChange, firstDayOfMonth, lastDayOfMonth } from "@/lib/format";
+import { fetchPeriodData, buildReportData } from "../report-shared";
 import { ChangeColumnToggle } from "../change-column-toggle";
 
 function periodLabel(fromM: number, toM: number, year: number) {
@@ -36,8 +36,11 @@ export default async function IncomeStatementPage({
   const prevAsOf = lastDayOfMonth(year - 1, toM);
   const currLabel = periodLabel(fromM, toM, year);
   const prevLabel = periodLabel(fromM, toM, year - 1);
+  const currentPeriod = { from: firstDayOfMonth(year, fromM), to: currentAsOf };
+  const prevPeriod = { from: firstDayOfMonth(year - 1, fromM), to: prevAsOf };
 
-  const pl = await fetchReportData(supabase, id, currentAsOf, prevAsOf, "pl");
+  const periodData = await fetchPeriodData(supabase, id, currentPeriod, prevPeriod);
+  const pl = { ...buildReportData(periodData, "pl"), error: periodData.error };
   const counts = (countsRaw as Record<string, number>) ?? {};
   const unassignedCount = counts["unassigned"] ?? 0;
 
@@ -111,7 +114,8 @@ export default async function IncomeStatementPage({
                   {g.notes.map((n) => (
                     <tr key={n.id} style={{ borderBottom: "1px solid var(--border-soft)" }}>
                       <td className="p-3">
-                        {n.name} <span style={{ color: "var(--muted)" }}>(ביאור {n.num})</span>
+                        {n.name}
+                        {n.num !== null && <span style={{ color: "var(--muted)" }}> (ביאור {n.num})</span>}
                       </td>
                       <td className="p-3 text-left tabular-nums">{formatAmount(n.curr)}</td>
                       <td className="p-3 text-left tabular-nums" style={{ color: "var(--muted)" }}>

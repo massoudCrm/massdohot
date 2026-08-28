@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { describeError } from "@/lib/format";
 
 // כפתור מחיקה עם אישור בתוך האתר (לא window.confirm של הדפדפן) — משמש בכל מקום באפליקציה
 // שיש בו פעולת מחיקה, כדי לשמור על עיצוב אחיד.
@@ -35,7 +36,7 @@ export function ConfirmDeleteButton({
       await onConfirm();
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

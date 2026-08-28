@@ -33,7 +33,7 @@ function TabButton({
 const NAV_ITEMS: NavItem[] = [
   { kind: "link", href: "/files", label: "קליטת קבצים", segment: "files" },
   { kind: "link", href: "/trial-balance", label: "מאזן בוחן ומיון", segment: "trial-balance" },
-  { kind: "disabled", label: "פקודות יומן" },
+  { kind: "link", href: "/journal-entries", label: "פקודות יומן", segment: "journal-entries" },
   { kind: "link", href: "/notes", label: "ביאורים", segment: "notes" },
   { kind: "link", href: "/balance-sheet", label: "מאזן", segment: "balance-sheet" },
   { kind: "link", href: "/income-statement", label: "רווח והפסד", segment: "income-statement" },

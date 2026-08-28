@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { describeError } from "@/lib/format";
 
 interface NoteSnapshotItem {
   name: string;
   group: string;
+  has_note: boolean;
 }
 
 interface GroupSnapshotItem {
@@ -31,7 +33,7 @@ async function replaceNotesWithSnapshot(
   if (notesSnapshot.length > 0) {
     const { error: insErr } = await supabase
       .from("notes")
-      .insert(notesSnapshot.map((n) => ({ client_id: clientId, name: n.name, group: n.group })));
+      .insert(notesSnapshot.map((n) => ({ client_id: clientId, name: n.name, group: n.group, has_note: n.has_note })));
     if (insErr) throw new Error(insErr.message);
   }
 
@@ -92,7 +94,7 @@ export function TemplateActions({
       if (error) throw error;
       setStatus(`תבנית הביאורים נשמרה עבור ${clientName}.`);
     } catch (e) {
-      setStatus("שמירה נכשלה: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("שמירה נכשלה: " + describeError(e));
     } finally {
       setBusy(null);
     }
@@ -123,7 +125,7 @@ export function TemplateActions({
       setStatus(`נטענה התבנית השמורה של ${clientName}.`);
       router.refresh();
     } catch (e) {
-      setStatus("טעינה נכשלה: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("טעינה נכשלה: " + describeError(e));
     } finally {
       setBusy(null);
     }
@@ -146,7 +148,7 @@ export function TemplateActions({
       if (error) throw error;
       setStatus("המבנה הנוכחי נקבע כתבנית ברירת מחדל לכל תיק חדש.");
     } catch (e) {
-      setStatus("שמירה נכשלה: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("שמירה נכשלה: " + describeError(e));
     } finally {
       setBusy(null);
     }
@@ -176,7 +178,7 @@ export function TemplateActions({
       setStatus("תבנית ברירת המחדל הוחלה.");
       router.refresh();
     } catch (e) {
-      setStatus("טעינה נכשלה: " + (e instanceof Error ? e.message : String(e)));
+      setStatus("טעינה נכשלה: " + describeError(e));
     } finally {
       setBusy(null);
     }

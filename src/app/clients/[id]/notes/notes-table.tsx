@@ -16,7 +16,8 @@ interface NoteRow {
   id: string;
   name: string;
   group: string;
-  num: number;
+  num: number | null;
+  has_note: boolean;
   count: number;
   subNotes: SubNoteRow[];
 }
@@ -67,7 +68,7 @@ function NoteEditorModal({
 
         <div className="mt-5 flex flex-col gap-2">
           <label className="text-base font-semibold" style={{ color: "var(--muted)" }}>
-            שם הביאור
+            שם הסעיף
           </label>
           <input
             autoFocus
@@ -155,7 +156,7 @@ function AddNoteButton({
 
   async function save() {
     if (!name.trim()) {
-      setError("יש להזין שם לביאור.");
+      setError("יש להזין שם לסעיף.");
       return;
     }
     setSaving(true);
@@ -182,12 +183,12 @@ function AddNoteButton({
         className="rounded-full px-6 py-3 text-lg font-bold text-white"
         style={{ background: "var(--accent)" }}
       >
-        + ביאור חדש
+        + סעיף חדש
       </button>
       <NoteEditorModal
         open={open}
         onClose={() => setOpen(false)}
-        title="ביאור חדש"
+        title="סעיף חדש"
         name={name}
         setName={setName}
         group={group}
@@ -239,7 +240,7 @@ function EditNoteButton({ note, groups, onSaved }: { note: NoteRow; groups: Repo
       <NoteEditorModal
         open={open}
         onClose={() => setOpen(false)}
-        title="עריכת ביאור"
+        title="עריכת סעיף"
         name={name}
         setName={setName}
         group={group}
@@ -251,6 +252,41 @@ function EditNoteButton({ note, groups, onSaved }: { note: NoteRow; groups: Repo
         submitLabel="שמור"
       />
     </>
+  );
+}
+
+// כפתור/תג שמסמן אם לסעיף יש ביאור ממוספר — סעיף רגיל מוצג בגוף הדוח בלי מספר; רק כשמסמנים
+// "יש ביאור" הוא מקבל מספר ברצף ומופיע גם ברשימת הביאורים המפורטת (ראו report-shared.ts).
+function NoteToggle({ note, onChanged }: { note: NoteRow; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    setBusy(true);
+    const supabase = createClient();
+    await supabase.from("notes").update({ has_note: !note.has_note }).eq("id", note.id);
+    setBusy(false);
+    onChanged();
+  }
+
+  return note.has_note ? (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title="לחיצה תסיר את הסימון כביאור"
+      className="rounded-full px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+      style={{ background: "var(--accent)" }}
+    >
+      ביאור {note.num}
+    </button>
+  ) : (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      className="rounded-full border-2 px-4 py-2 text-sm font-bold"
+      style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+    >
+      {busy ? "…" : "+ הוסף ביאור"}
+    </button>
   );
 }
 
@@ -496,14 +532,14 @@ export function NotesTable({
     <div className="rounded-[28px] border-2 p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
       <div className="flex items-center justify-between">
         <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-          ביאורים
+          סעיפי הדוח
         </div>
         <AddNoteButton clientId={clientId} groups={groups} onAdded={() => router.refresh()} />
       </div>
 
       {notes.length === 0 && (
         <div className="mt-6 text-lg" style={{ color: "var(--muted)" }}>
-          אין עדיין ביאורים. לחץ &quot;+ ביאור חדש&quot; כדי להתחיל.
+          אין עדיין סעיפים. לחץ &quot;+ סעיף חדש&quot; כדי להתחיל.
         </div>
       )}
 
@@ -511,14 +547,14 @@ export function NotesTable({
         <table className="mt-6 w-full border-collapse text-lg">
           <thead>
             <tr style={{ background: "var(--background)" }}>
-              <th className="w-16 p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
-                מס&apos;
-              </th>
               <th className="p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
-                שם הביאור
+                שם הסעיף
               </th>
-              <th className="w-64 p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
+              <th className="w-56 p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
                 קבוצה בדוח
+              </th>
+              <th className="w-36 p-3 text-right text-sm" style={{ color: "var(--muted)" }}>
+                ביאור
               </th>
               <th className="w-28 p-3 text-left text-sm" style={{ color: "var(--muted)" }}>
                 סעיפים
@@ -530,9 +566,11 @@ export function NotesTable({
             {notes.map((n) => (
               <Fragment key={n.id}>
                 <tr style={{ borderBottom: expanded.has(n.id) ? "none" : "1.5px solid var(--border-soft)" }}>
-                  <td className="p-3 font-bold">{n.num}</td>
                   <td className="p-3 font-semibold">{n.name}</td>
                   <td className="p-3">{n.group}</td>
+                  <td className="p-3">
+                    <NoteToggle note={n} onChanged={() => router.refresh()} />
+                  </td>
                   <td className="p-3 text-left font-semibold">{n.count.toLocaleString("he-IL")}</td>
                   <td className="p-3">
                     <div className="flex justify-end gap-2">
@@ -545,11 +583,11 @@ export function NotesTable({
                       </button>
                       <EditNoteButton note={n} groups={groups} onSaved={() => router.refresh()} />
                       <ConfirmDeleteButton
-                        title="מחיקת ביאור"
+                        title="מחיקת סעיף"
                         message={
                           n.count > 0
-                            ? `האם אתה בטוח שברצונך למחוק את הביאור "${n.name}"? ${n.count.toLocaleString("he-IL")} חשבונות המשויכים אליו יהפכו ללא מוינים.`
-                            : `האם אתה בטוח שברצונך למחוק את הביאור "${n.name}"?`
+                            ? `האם אתה בטוח שברצונך למחוק את הסעיף "${n.name}"? ${n.count.toLocaleString("he-IL")} חשבונות המשויכים אליו יהפכו ללא מוינים.`
+                            : `האם אתה בטוח שברצונך למחוק את הסעיף "${n.name}"?`
                         }
                         onConfirm={() => removeNote(n)}
                       />

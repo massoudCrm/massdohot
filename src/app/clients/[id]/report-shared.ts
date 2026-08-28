@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
+export interface Period {
+  from: string;
+  to: string;
+}
+
 export interface ReportGroupRow {
   id: string;
   statement: "bs" | "pl";
@@ -14,6 +19,7 @@ export interface NoteRow {
   id: string;
   name: string;
   group: string;
+  has_note: boolean;
 }
 
 interface BalanceRow {
@@ -23,10 +29,16 @@ interface BalanceRow {
   balance: number;
 }
 
+interface SubNoteRow {
+  id: string;
+  note_id: string;
+  name: string;
+}
+
 export interface NoteTotal {
   id: string;
   name: string;
-  num: number;
+  num: number | null;
   curr: number;
   prev: number;
 }
@@ -40,8 +52,20 @@ export interface GroupTotal {
   prev: number;
 }
 
+export interface NoteDetail {
+  id: string;
+  name: string;
+  num: number | null;
+  statement: "bs" | "pl";
+  curr: number;
+  prev: number;
+  direct: { curr: number; prev: number };
+  subNotes: { id: string; name: string; curr: number; prev: number }[];
+}
+
 // account_balances_as_of מחזירה מערך JSON יחיד בתוך שורה בודדת (לא טבלת שורות), כדי לעקוף
-// את מגבלת ה-1,000 שורות שSupabase/PostgREST אוכף על תשובות מרובות-שורות.
+// את מגבלת ה-1,000 שורות שSupabase/PostgREST אוכף על תשובות מרובות-שורות. משמשת למאזן
+// (חשבונות מאזן הם מטבעם יתרה מצטברת "נכון לתאריך").
 async function fetchBalances(
   supabase: SupabaseClient,
   clientId: string,
@@ -55,60 +79,155 @@ async function fetchBalances(
   return { rows: (data as BalanceRow[]) ?? [], error: null };
 }
 
-// מרכיב את מבנה הדוח (קבוצות -> ביאורים -> סכומים) לתקופה נתונה, עבור statement מסוים
-// (מאזן או רווח והפסד). מספור הביאורים מחושב על כל הביאורים של הלקוח יחד (כמו במסך "ביאורים"),
-// כדי ש"ביאור 4" יתייחס לאותו ביאור בכל מסכי המערכת.
-export async function fetchReportData(
+// חשבונות רווח והפסד לא יכולים להיות "יתרה מצטברת נכון לתאריך" כמו מאזן — ברגע שיש כמה
+// שנים טעונות, תוכנת ההנה"ח כבר ביצעה "סגירת שנה" (מאפסת כל חשבון רו"ה ומעבירה לעודפים)
+// לשנים סגורות, ופקודת הסגירה הזו כלולה בנתונים. חישוב מצטבר "עד תאריך" יכלול את פקודת
+// הסגירה ותמיד יראה 0 לשנה סגורה. לכן רו"ה מחושב כתנועה בתוך טווח התקופה בלבד, תוך
+// החרגה מפורשת של פקודות הסגירה עצמן (מזוהות לפי התיאור שלהן בכרטסת — ראו migration 0018).
+// שאילתה יקרה (סריקת כל התנועות + GROUP BY על כל החשבונות) — לכן נקראת פעם אחת בלבד לכל
+// תקופה דרך fetchPeriodData, ולא בנפרד מכל מקום שצריך רווח והפסד (ראו fetchReportData/
+// fetchNoteDetails הישנים — קריאה כפולה-משולשת לפונקציה הזו גרמה בפועל ל-timeout באתר).
+export async function fetchPlActivity(
   supabase: SupabaseClient,
   clientId: string,
-  currentAsOf: string,
-  prevAsOf: string,
-  statement: "bs" | "pl"
-): Promise<{
-  groups: GroupTotal[];
-  total: { curr: number; prev: number };
+  period: Period
+): Promise<{ rows: BalanceRow[]; error: { message: string } | null }> {
+  const { data, error } = await supabase.rpc("pl_period_activity", {
+    p_client_id: clientId,
+    p_period_start: period.from,
+    p_period_end: period.to,
+  });
+  if (error) return { rows: [], error };
+  return { rows: (data as BalanceRow[]) ?? [], error: null };
+}
+
+export interface PeriodData {
+  bsCurr: BalanceRow[];
+  bsPrev: BalanceRow[];
+  plCurr: BalanceRow[];
+  plPrev: BalanceRow[];
+  notes: NoteRow[];
+  groups: ReportGroupRow[];
+  subNotes: SubNoteRow[];
   error: string | null;
-}> {
+}
+
+// טוען פעם אחת בלבד את כל הנתונים הגולמיים הדרושים למאזן + רווח והפסד + פירוט ביאורים
+// לתקופה נתונה. מסכי מאזן/רווח והפסד/הדפסה קוראים לזה פעם אחת ומעבירים את התוצאה הלאה
+// ל-buildReportData/buildNoteDetails (פונקציות טהורות, בלי עוד קריאות רשת) — לא קוראים
+// שוב לשאילתות היקרות (במיוחד pl_period_activity) בכל פעם שצריך תצוגה נוספת של אותה תקופה.
+export async function fetchPeriodData(
+  supabase: SupabaseClient,
+  clientId: string,
+  current: Period,
+  prev: Period
+): Promise<PeriodData> {
   const [
-    { rows: currBalances, error: currErr },
-    { rows: prevBalances, error: prevErr },
+    { rows: bsCurr, error: bsCurrErr },
+    { rows: bsPrev, error: bsPrevErr },
+    { rows: plCurr, error: plCurrErr },
+    { rows: plPrev, error: plPrevErr },
     { data: notesRaw, error: notesErr },
     { data: groupsRaw, error: groupsErr },
+    { data: subNotesRaw, error: subNotesErr },
   ] = await Promise.all([
-    fetchBalances(supabase, clientId, currentAsOf),
-    fetchBalances(supabase, clientId, prevAsOf),
-    supabase.from("notes").select("id, name, group").eq("client_id", clientId),
+    fetchBalances(supabase, clientId, current.to),
+    fetchBalances(supabase, clientId, prev.to),
+    fetchPlActivity(supabase, clientId, current),
+    fetchPlActivity(supabase, clientId, prev),
+    supabase.from("notes").select("id, name, group, has_note").eq("client_id", clientId),
     supabase
       .from("report_groups")
       .select("id, statement, side, name, sort_order")
       .eq("client_id", clientId)
       .order("statement")
       .order("sort_order"),
+    supabase
+      .from("sub_notes")
+      .select("id, note_id, name, sort_order, notes!inner(client_id)")
+      .eq("notes.client_id", clientId)
+      .order("sort_order"),
   ]);
 
-  const error = currErr?.message || prevErr?.message || notesErr?.message || groupsErr?.message || null;
-  if (error) return { groups: [], total: { curr: 0, prev: 0 }, error };
+  const error =
+    bsCurrErr?.message ||
+    bsPrevErr?.message ||
+    plCurrErr?.message ||
+    plPrevErr?.message ||
+    notesErr?.message ||
+    groupsErr?.message ||
+    subNotesErr?.message ||
+    null;
 
-  const allGroups = (groupsRaw ?? []) as ReportGroupRow[];
-  const notes = (notesRaw ?? []) as NoteRow[];
+  return {
+    bsCurr,
+    bsPrev,
+    plCurr,
+    plPrev,
+    notes: (notesRaw ?? []) as NoteRow[],
+    groups: (groupsRaw ?? []) as ReportGroupRow[],
+    subNotes: (subNotesRaw ?? []) as SubNoteRow[],
+    error,
+  };
+}
 
-  // אותה שיטת מיספור בדיוק כמו במסך "ביאורים": קבוצה שנמחקה מוצגת בסוף במקום לגרום לקריסה.
-  const groupOrder = new Map(allGroups.map((g, i) => [g.name, i]));
-  const orderedNotes = notes
+function aggregateByNote(rows: BalanceRow[]) {
+  const byNote = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.note_id) continue;
+    byNote.set(r.note_id, (byNote.get(r.note_id) ?? 0) + r.balance);
+  }
+  return byNote;
+}
+
+function aggregateByKey(rows: BalanceRow[]) {
+  const byKey = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.note_id) continue;
+    const key = `${r.note_id}|${r.sub_note_id ?? ""}`;
+    byKey.set(key, (byKey.get(key) ?? 0) + r.balance);
+  }
+  return byKey;
+}
+
+// notes הן בפועל "סעיפים" בגוף הדוח (מאזן/רו"ה) — כל חשבון משויך לסעיף, אבל רק סעיף
+// שסומן has_note=true הופך בפועל ל"ביאור" ממוספר. הסדר עצמו (לפי מיקום הקבוצה בדוח) זהה
+// לכל הסעיפים; המספור עצמו מדלג על סעיפים בלי ביאור, כדי שהמספור יישאר רציף ומשמעותי.
+export function orderNotesAndNumber<T extends { id: string; group: string; has_note: boolean }>(
+  notes: T[],
+  groups: { name: string }[]
+) {
+  const groupOrder = new Map(groups.map((g, i) => [g.name, i]));
+  const ordered = notes
     .slice()
     .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
-  const noteNum = new Map(orderedNotes.map((n, i) => [n.id, i + 1]));
+  const noteNum = new Map<string, number>();
+  let counter = 0;
+  for (const n of ordered) {
+    if (n.has_note) {
+      counter += 1;
+      noteNum.set(n.id, counter);
+    }
+  }
+  return { ordered, noteNum };
+}
 
-  const currByNote = new Map<string, number>();
-  for (const r of currBalances) {
-    if (!r.note_id) continue;
-    currByNote.set(r.note_id, (currByNote.get(r.note_id) ?? 0) + r.balance);
-  }
-  const prevByNote = new Map<string, number>();
-  for (const r of prevBalances) {
-    if (!r.note_id) continue;
-    prevByNote.set(r.note_id, (prevByNote.get(r.note_id) ?? 0) + r.balance);
-  }
+// מרכיב את מבנה הדוח (קבוצות -> ביאורים -> סכומים) עבור statement מסוים (מאזן או רווח
+// והפסד), מתוך הנתונים שכבר נטענו ב-fetchPeriodData. מספור הביאורים מחושב על כל הביאורים
+// של הלקוח יחד (כמו במסך "ביאורים"), כדי ש"ביאור 4" יתייחס לאותו ביאור בכל מסכי המערכת.
+export function buildReportData(
+  data: PeriodData,
+  statement: "bs" | "pl"
+): { groups: GroupTotal[]; total: { curr: number; prev: number } } {
+  const { notes, groups: allGroups } = data;
+  const currRows = statement === "pl" ? data.plCurr : data.bsCurr;
+  const prevRows = statement === "pl" ? data.plPrev : data.bsPrev;
+
+  // אותה שיטת מיספור בדיוק כמו במסך "ביאורים": קבוצה שנמחקה מוצגת בסוף במקום לגרום לקריסה.
+  const { ordered: orderedNotes, noteNum } = orderNotesAndNumber(notes, allGroups);
+
+  const currByNote = aggregateByNote(currRows);
+  const prevByNote = aggregateByNote(prevRows);
 
   const relevantGroups = allGroups
     .filter((g) => g.statement === statement)
@@ -126,7 +245,7 @@ export async function fetchReportData(
         return {
           id: n.id,
           name: n.name,
-          num: noteNum.get(n.id) ?? 0,
+          num: noteNum.get(n.id) ?? null,
           curr: shouldFlip ? -rawCurr : rawCurr,
           prev: shouldFlip ? -rawPrev : rawPrev,
         };
@@ -146,71 +265,17 @@ export async function fetchReportData(
     prev: groups.reduce((s, g) => s + g.prev, 0),
   };
 
-  return { groups, total, error: null };
-}
-
-export interface NoteDetail {
-  id: string;
-  name: string;
-  num: number;
-  statement: "bs" | "pl";
-  curr: number;
-  prev: number;
-  direct: { curr: number; prev: number };
-  subNotes: { id: string; name: string; curr: number; prev: number }[];
-}
-
-interface SubNoteRow {
-  id: string;
-  note_id: string;
-  name: string;
+  return { groups, total };
 }
 
 // פירוט מלא של כל ביאור (משני הדוחות יחד, במספור אחיד) לצורך תצוגת הדפסה: סכום כולל,
 // ופילוח לפי תת-ביאור (אם יש) + יתרת החשבונות המשויכים ישירות לביאור בלי תת-ביאור.
-export async function fetchNoteDetails(
-  supabase: SupabaseClient,
-  clientId: string,
-  currentAsOf: string,
-  prevAsOf: string
-): Promise<{ notes: NoteDetail[]; error: string | null }> {
-  const [
-    { rows: currBalances, error: currErr },
-    { rows: prevBalances, error: prevErr },
-    { data: notesRaw, error: notesErr },
-    { data: groupsRaw, error: groupsErr },
-    { data: subNotesRaw, error: subNotesErr },
-  ] = await Promise.all([
-    fetchBalances(supabase, clientId, currentAsOf),
-    fetchBalances(supabase, clientId, prevAsOf),
-    supabase.from("notes").select("id, name, group").eq("client_id", clientId),
-    supabase
-      .from("report_groups")
-      .select("id, statement, side, name, sort_order")
-      .eq("client_id", clientId)
-      .order("statement")
-      .order("sort_order"),
-    supabase
-      .from("sub_notes")
-      .select("id, note_id, name, sort_order, notes!inner(client_id)")
-      .eq("notes.client_id", clientId)
-      .order("sort_order"),
-  ]);
-
-  const error =
-    currErr?.message || prevErr?.message || notesErr?.message || groupsErr?.message || subNotesErr?.message || null;
-  if (error) return { notes: [], error };
-
-  const allGroups = (groupsRaw ?? []) as ReportGroupRow[];
-  const notes = (notesRaw ?? []) as NoteRow[];
-  const subNotes = (subNotesRaw ?? []) as SubNoteRow[];
+// ביאורי מאזן משתמשים ביתרה מצטברת, ביאורי רו"ה בתנועת התקופה — ראו buildReportData למעלה.
+export function buildNoteDetails(data: PeriodData): NoteDetail[] {
+  const { notes, groups: allGroups, subNotes } = data;
 
   const groupByName = new Map(allGroups.map((g) => [g.name, g]));
-  const groupOrder = new Map(allGroups.map((g, i) => [g.name, i]));
-  const orderedNotes = notes
-    .slice()
-    .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
-  const noteNum = new Map(orderedNotes.map((n, i) => [n.id, i + 1]));
+  const { ordered: orderedNotes, noteNum } = orderNotesAndNumber(notes, allGroups);
 
   const subNotesByNote = new Map<string, SubNoteRow[]>();
   for (const sn of subNotes) {
@@ -219,22 +284,17 @@ export async function fetchNoteDetails(
     subNotesByNote.set(sn.note_id, list);
   }
 
-  function aggregate(rows: BalanceRow[]) {
-    const byKey = new Map<string, number>();
-    for (const r of rows) {
-      if (!r.note_id) continue;
-      const key = `${r.note_id}|${r.sub_note_id ?? ""}`;
-      byKey.set(key, (byKey.get(key) ?? 0) + r.balance);
-    }
-    return byKey;
-  }
-  const currByKey = aggregate(currBalances);
-  const prevByKey = aggregate(prevBalances);
+  const bsCurrByKey = aggregateByKey(data.bsCurr);
+  const bsPrevByKey = aggregateByKey(data.bsPrev);
+  const plCurrByKey = aggregateByKey(data.plCurr);
+  const plPrevByKey = aggregateByKey(data.plPrev);
 
-  const details: NoteDetail[] = orderedNotes.map((n) => {
+  return orderedNotes.map((n) => {
     const group = groupByName.get(n.group);
     const statement = group?.statement ?? "bs";
     const shouldFlip = statement === "pl" ? true : group?.side === "liabilities_equity";
+    const currByKey = statement === "pl" ? plCurrByKey : bsCurrByKey;
+    const prevByKey = statement === "pl" ? plPrevByKey : bsPrevByKey;
 
     const subDetails = (subNotesByNote.get(n.id) ?? []).map((sn) => {
       const key = `${n.id}|${sn.id}`;
@@ -254,7 +314,7 @@ export async function fetchNoteDetails(
     return {
       id: n.id,
       name: n.name,
-      num: noteNum.get(n.id) ?? 0,
+      num: noteNum.get(n.id) ?? null,
       statement,
       curr: direct.curr + subDetails.reduce((s, d) => s + d.curr, 0),
       prev: direct.prev + subDetails.reduce((s, d) => s + d.prev, 0),
@@ -262,6 +322,4 @@ export async function fetchNoteDetails(
       subNotes: subDetails,
     };
   });
-
-  return { notes: details, error: null };
 }

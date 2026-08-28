@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { lastDayOfMonth } from "@/lib/format";
+import { firstDayOfMonth, lastDayOfMonth } from "@/lib/format";
 import { PeriodSelector } from "./period-selector";
 import { TrialBalanceTable, type TbRow } from "./trial-balance-table";
 import { SortRulesPanel, type SortRule } from "./sort-rules-panel";
+import { fetchPlActivity, orderNotesAndNumber } from "../report-shared";
 
 const MONTH_NAMES = [
   "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
@@ -70,6 +71,8 @@ export default async function TrialBalancePage({
 
   const currentAsOf = lastDayOfMonth(year, toM);
   const prevAsOf = lastDayOfMonth(year - 1, toM);
+  const currentPeriod = { from: firstDayOfMonth(year, fromM), to: currentAsOf };
+  const prevPeriod = { from: firstDayOfMonth(year - 1, fromM), to: prevAsOf };
 
   const [
     { rows: currentBalances, error: currErr },
@@ -79,10 +82,12 @@ export default async function TrialBalancePage({
     { data: sourceGroups },
     { data: subNotesRaw },
     { data: groupsRaw },
+    { rows: plCurrRows, error: plCurrErr },
+    { rows: plPrevRows, error: plPrevErr },
   ] = await Promise.all([
     fetchAccountBalances(supabase, id, currentAsOf),
     fetchAccountBalances(supabase, id, prevAsOf),
-    supabase.from("notes").select("id, name, group").eq("client_id", id),
+    supabase.from("notes").select("id, name, group, has_note").eq("client_id", id),
     supabase
       .from("sort_rules")
       .select("id, from_code, to_code, note_id, sub_note_id, source_group_code")
@@ -93,41 +98,53 @@ export default async function TrialBalancePage({
       .select("id, note_id, name, sort_order, notes!inner(client_id)")
       .eq("notes.client_id", id)
       .order("sort_order"),
-    supabase.from("report_groups").select("name").eq("client_id", id).order("statement").order("sort_order"),
+    supabase.from("report_groups").select("name, statement").eq("client_id", id).order("statement").order("sort_order"),
+    fetchPlActivity(supabase, id, currentPeriod),
+    fetchPlActivity(supabase, id, prevPeriod),
   ]);
+
+  // חשבונות רווח והפסד לא מוצגים כיתרה מצטברת-מאז-ומעולם (כמו מאזן) אלא כתנועת התקופה
+  // הנבחרת בלבד — אותו עיקרון בדיוק כמו במסך רווח והפסד, ראו ההסבר ליד fetchPlActivity
+  // ב-report-shared.ts. חשבונות שעדיין לא מוינים לביאור נשארים ביתרה המצטברת כי לא ידוע
+  // אם הם בכלל רווח והפסד.
+  const plGroupNames = new Set((groupsRaw ?? []).filter((g) => g.statement === "pl").map((g) => g.name));
+  const plNoteIds = new Set((notesRaw ?? []).filter((n) => plGroupNames.has(n.group)).map((n) => n.id));
+  const plCurrByAccount = new Map(plCurrRows.map((r) => [r.account_id, r.balance]));
+  const plPrevByAccount = new Map(plPrevRows.map((r) => [r.account_id, r.balance]));
 
   const prevByAccount = new Map<string, number>(
     prevBalances.map((r) => [r.account_id, r.balance])
   );
 
-  // ביאור שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה.
-  const groupOrder = new Map((groupsRaw ?? []).map((g, i) => [g.name, i]));
-  const orderedNotes = (notesRaw ?? [])
-    .slice()
-    .sort((a, b) => (groupOrder.get(a.group) ?? 999) - (groupOrder.get(b.group) ?? 999));
+  // סעיף שהקבוצה שלו נמחקה (טקסט חופשי בלי FK) מוצג בסוף הרשימה במקום לגרום לקריסה. מספור
+  // "ביאור N" חל רק על סעיפים שסומנו has_note — סעיף רגיל מוצג בלי מספר (ראו report-shared.ts).
+  const { ordered: orderedNotes, noteNum } = orderNotesAndNumber(notesRaw ?? [], groupsRaw ?? []);
   const subNotesByNote = new Map<string, { id: string; noteId: string; label: string }[]>();
   for (const sn of subNotesRaw ?? []) {
     const list = subNotesByNote.get(sn.note_id) ?? [];
     list.push({ id: sn.id, noteId: sn.note_id, label: sn.name });
     subNotesByNote.set(sn.note_id, list);
   }
-  const noteOptions = orderedNotes.map((n, i) => ({
+  const noteOptions = orderedNotes.map((n) => ({
     id: n.id,
-    label: `${i + 1}. ${n.name}`,
+    label: noteNum.has(n.id) ? `${n.name} (ביאור ${noteNum.get(n.id)})` : n.name,
     subNotes: subNotesByNote.get(n.id) ?? [],
   }));
 
-  const rows: TbRow[] = currentBalances.map((r) => ({
-    accountId: r.account_id,
-    code: r.code,
-    name: r.name,
-    noteId: r.note_id,
-    subNoteId: r.sub_note_id,
-    sourceGroupCode: r.source_group_code,
-    sourceGroupDesc: r.source_group_desc,
-    curr: r.balance,
-    prev: prevByAccount.get(r.account_id) ?? 0,
-  }));
+  const rows: TbRow[] = currentBalances.map((r) => {
+    const isPl = r.note_id !== null && plNoteIds.has(r.note_id);
+    return {
+      accountId: r.account_id,
+      code: r.code,
+      name: r.name,
+      noteId: r.note_id,
+      subNoteId: r.sub_note_id,
+      sourceGroupCode: r.source_group_code,
+      sourceGroupDesc: r.source_group_desc,
+      curr: isPl ? plCurrByAccount.get(r.account_id) ?? 0 : r.balance,
+      prev: isPl ? plPrevByAccount.get(r.account_id) ?? 0 : prevByAccount.get(r.account_id) ?? 0,
+    };
+  });
 
   const totalCurr = rows.reduce((s, r) => s + r.curr, 0);
   const totalPrev = rows.reduce((s, r) => s + r.prev, 0);
@@ -149,12 +166,12 @@ export default async function TrialBalancePage({
           <PeriodSelector clientId={id} months={MONTH_NAMES} fromM={fromM} toM={toM} year={year} />
         </div>
 
-        {(clientError || currErr || prevErr) && (
+        {(clientError || currErr || prevErr || plCurrErr || plPrevErr) && (
           <div
             className="rounded-2xl border-2 p-5 text-lg"
             style={{ borderColor: "var(--warn-border)", background: "var(--warn-soft)", color: "var(--warn-text)" }}
           >
-            שגיאה בטעינת הנתונים: {currErr?.message || prevErr?.message}
+            שגיאה בטעינת הנתונים: {currErr?.message || prevErr?.message || plCurrErr?.message || plPrevErr?.message}
           </div>
         )}
 
