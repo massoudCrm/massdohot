@@ -214,7 +214,7 @@ export default async function PrintPage({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <td className="pb-2 font-bold">נכסים</td>
+                <td></td>
                 <td className="pb-2 text-left font-bold">{currLabel}</td>
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}
@@ -242,7 +242,7 @@ export default async function PrintPage({
           <table className="mt-8 w-full border-collapse text-sm">
             <thead>
               <tr>
-                <td className="pb-2 font-bold">התחייבויות והון</td>
+                <td></td>
                 <td className="pb-2 text-left font-bold">{currLabel}</td>
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}

@@ -174,10 +174,7 @@ export default async function BalanceSheetPage({
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <div className="rounded-[28px] border-2 p-6" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-              נכסים
-            </div>
-            <div className="mt-4">
+            <div>
               {assetGroups.map((g) => (
                 <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
               ))}
@@ -201,10 +198,7 @@ export default async function BalanceSheetPage({
           </div>
 
           <div className="rounded-[28px] border-2 p-6" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
-              התחייבויות והון
-            </div>
-            <div className="mt-4">
+            <div>
               {liabEquityGroups.map((g) => (
                 <GroupBlock key={g.id} group={g} currLabel={currLabel} prevLabel={prevLabel} showChanges={showChanges} />
               ))}
