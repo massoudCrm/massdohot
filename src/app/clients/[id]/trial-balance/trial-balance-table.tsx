@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatAmount, formatSourceGroupCode } from "@/lib/format";
+import { formatAmount, formatSourceGroupCode, describeError } from "@/lib/format";
 
 export interface TbRow {
   accountId: string;
@@ -69,6 +69,136 @@ export function AssignmentOptions({ notes }: { notes: NoteOption[] }) {
   );
 }
 
+const NEW_SUB_NOTE = "__new_sub_note__";
+
+// מודל ליצירת תת-ביאור מבלי לצאת ממסך המיון — נפתח כשבוחרים "+ תת-ביאור חדש" בתוך תפריט הביאור,
+// יוצר את תת-הביאור ומיד משייך אליו את השורה/השורות שנבחרו.
+function CreateSubNoteModal({
+  open,
+  notes,
+  defaultNoteId,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  notes: NoteOption[];
+  defaultNoteId: string;
+  onClose: () => void;
+  onCreated: (parentNoteId: string, subNote: SubNoteOption) => void;
+}) {
+  const [parentId, setParentId] = useState(defaultNoteId);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setParentId(defaultNoteId);
+      setName("");
+      setError("");
+    }
+  }, [open, defaultNoteId]);
+
+  if (!open) return null;
+
+  async function save() {
+    if (!parentId) {
+      setError("יש לבחור תחת איזה ביאור ליצור את תת-הביאור.");
+      return;
+    }
+    if (!name.trim()) {
+      setError("יש להזין שם.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const parent = notes.find((n) => n.id === parentId);
+    const supabase = createClient();
+    const { data, error: err } = await supabase
+      .from("sub_notes")
+      .insert({ note_id: parentId, name: name.trim(), sort_order: parent?.subNotes.length ?? 0 })
+      .select("id")
+      .single();
+    setSaving(false);
+    if (err || !data) {
+      setError("יצירה נכשלה: " + describeError(err));
+      return;
+    }
+    onCreated(parentId, { id: data.id as string, noteId: parentId, label: name.trim() });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{ background: "rgba(32,30,29,0.45)" }}
+      onClick={() => !saving && onClose()}
+    >
+      <div
+        className="w-full max-w-md rounded-[28px] p-8"
+        style={{ background: "var(--card)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-2xl font-extrabold" style={{ fontFamily: "var(--font-display)" }}>
+          תת-ביאור חדש
+        </div>
+        <div className="mt-5 flex flex-col gap-2">
+          <label className="text-base font-semibold" style={{ color: "var(--muted)" }}>
+            תחת איזה ביאור
+          </label>
+          <select
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            className="rounded-full border-2 px-5 py-3 text-lg"
+            style={{ borderColor: "var(--border)", background: "var(--background)" }}
+          >
+            <option value="">בחר ביאור…</option>
+            {notes.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          <label className="text-base font-semibold" style={{ color: "var(--muted)" }}>
+            שם תת-הביאור
+          </label>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-full border-2 px-5 py-3 text-lg"
+            style={{ borderColor: "var(--border)", background: "var(--background)" }}
+          />
+        </div>
+        {error && (
+          <div className="mt-4 text-base font-semibold" style={{ color: "var(--warn-text)" }}>
+            {error}
+          </div>
+        )}
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 rounded-full py-3 text-lg font-bold text-white disabled:opacity-60"
+            style={{ background: "var(--accent)" }}
+          >
+            {saving ? "יוצר…" : "צור ושייך"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 rounded-full border-2 py-3 text-lg font-bold"
+            style={{ borderColor: "var(--border)" }}
+          >
+            ביטול
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TrialBalanceTable({
   clientId,
   rows,
@@ -95,6 +225,13 @@ export function TrialBalanceTable({
   const [assigning, setAssigning] = useState(false);
   // מצב אופטימי מקומי לשיוך ביאור/תת-ביאור, כדי שהטבלה תתעדכן מיד בלי לחכות לרענון מהשרת
   const [assignOverride, setAssignOverride] = useState<Record<string, Assignment>>({});
+  // עותק מקומי של רשימת הביאורים, כדי שתת-ביאור שנוצר עכשיו יופיע מיד ברשימה בלי לחכות לרענון מהשרת
+  const [localNotes, setLocalNotes] = useState(notes);
+  useEffect(() => setLocalNotes(notes), [notes]);
+  // איפה לפתוח את מודל "תת-ביאור חדש": לשורה בודדת, או לכל השורות המסומנות
+  const [newSubNoteTarget, setNewSubNoteTarget] = useState<
+    { scope: "row"; accountId: string; defaultNoteId: string } | { scope: "bulk"; defaultNoteId: string } | null
+  >(null);
 
   const assignmentOf = (r: TbRow): Assignment =>
     r.accountId in assignOverride ? assignOverride[r.accountId] : { noteId: r.noteId, subNoteId: r.subNoteId };
@@ -134,7 +271,7 @@ export function TrialBalanceTable({
   }
 
   async function setRowAssignment(accountId: string, value: string) {
-    const assignment = parseAssignmentValue(value, notes);
+    const assignment = parseAssignmentValue(value, localNotes);
     setAssignOverride((s) => ({ ...s, [accountId]: assignment }));
     const supabase = createClient();
     await supabase
@@ -144,9 +281,17 @@ export function TrialBalanceTable({
     router.refresh();
   }
 
-  async function applyBulk() {
-    if (!bulkValue || selected.size === 0) return;
-    const assignment = parseAssignmentValue(bulkValue, notes);
+  function handleRowSelectChange(r: TbRow, value: string) {
+    if (value === NEW_SUB_NOTE) {
+      setNewSubNoteTarget({ scope: "row", accountId: r.accountId, defaultNoteId: assignmentOf(r).noteId ?? "" });
+      return;
+    }
+    setRowAssignment(r.accountId, value);
+  }
+
+  async function applyAssignmentToSelected(value: string) {
+    if (!value || selected.size === 0) return;
+    const assignment = parseAssignmentValue(value, localNotes);
     setAssigning(true);
     const ids = [...selected];
     setAssignOverride((s) => {
@@ -163,6 +308,30 @@ export function TrialBalanceTable({
     setSelected(new Set());
     setBulkValue("");
     router.refresh();
+  }
+
+  async function applyBulk() {
+    await applyAssignmentToSelected(bulkValue);
+  }
+
+  function handleBulkSelectChange(value: string) {
+    if (value === NEW_SUB_NOTE) {
+      setNewSubNoteTarget({ scope: "bulk", defaultNoteId: "" });
+      return;
+    }
+    setBulkValue(value);
+  }
+
+  function handleSubNoteCreated(parentNoteId: string, subNote: SubNoteOption) {
+    setLocalNotes((prev) => prev.map((n) => (n.id === parentNoteId ? { ...n, subNotes: [...n.subNotes, subNote] } : n)));
+    const value = assignmentValue({ noteId: parentNoteId, subNoteId: subNote.id });
+    const target = newSubNoteTarget;
+    setNewSubNoteTarget(null);
+    if (target?.scope === "row") {
+      setRowAssignment(target.accountId, value);
+    } else if (target?.scope === "bulk") {
+      applyAssignmentToSelected(value);
+    }
   }
 
   return (
@@ -214,12 +383,13 @@ export function TrialBalanceTable({
           <span className="text-base font-bold">סומנו {selected.size.toLocaleString("he-IL")} שורות</span>
           <select
             value={bulkValue}
-            onChange={(e) => setBulkValue(e.target.value)}
+            onChange={(e) => handleBulkSelectChange(e.target.value)}
             className="min-w-[220px] rounded-full border-2 px-4 py-2 text-base"
             style={{ borderColor: "var(--border)", background: "var(--card)" }}
           >
             <option value="">הקצה את הסימון לביאור…</option>
-            <AssignmentOptions notes={notes} />
+            <option value={NEW_SUB_NOTE}>+ תת-ביאור חדש…</option>
+            <AssignmentOptions notes={localNotes} />
           </select>
           <button
             onClick={applyBulk}
@@ -300,7 +470,7 @@ export function TrialBalanceTable({
                   <td className="p-3">
                     <select
                       value={value}
-                      onChange={(e) => setRowAssignment(r.accountId, e.target.value)}
+                      onChange={(e) => handleRowSelectChange(r, e.target.value)}
                       className="w-full rounded-full border-2 px-3 py-2 text-base"
                       style={
                         noteId
@@ -309,7 +479,8 @@ export function TrialBalanceTable({
                       }
                     >
                       <option value="">— לא מוין —</option>
-                      <AssignmentOptions notes={notes} />
+                      <option value={NEW_SUB_NOTE}>+ תת-ביאור חדש…</option>
+                      <AssignmentOptions notes={localNotes} />
                     </select>
                   </td>
                 </tr>
@@ -338,6 +509,14 @@ export function TrialBalanceTable({
           </tfoot>
         </table>
       </div>
+
+      <CreateSubNoteModal
+        open={newSubNoteTarget !== null}
+        notes={localNotes}
+        defaultNoteId={newSubNoteTarget?.defaultNoteId ?? ""}
+        onClose={() => setNewSubNoteTarget(null)}
+        onCreated={handleSubNoteCreated}
+      />
     </div>
   );
 }

@@ -10,22 +10,56 @@ function periodLabel(fromM: number, toM: number, year: number) {
   return fromM === toM ? `${two(fromM)}/${year}` : `${two(fromM)}-${two(toM)}/${year}`;
 }
 
+// המאזן הוא תמונת מצב לרגע נתון (לא לתקופה) — הכותרת מציגה "ליום DD/MM/YYYY", לא טווח חודשים.
+function asOfLabel(isoDate: string) {
+  return `ליום ${isoDate.split("-").reverse().join("/")}`;
+}
+
+// בדוח האמיתי סעיפים עם יתרה אפסית בשתי השנים לא מוצגים כלל, וקבוצה שכל הסעיפים בה
+// התאפסו לא מוצגת בכלל. מיושם רק במאזן המודפס (לא במסך האינטראקטיבי, ששם רואים הכול).
+function hideZeroRows(groups: GroupTotal[]): GroupTotal[] {
+  return groups
+    .map((g) => ({
+      ...g,
+      notes: g.notes.filter((n) => Math.round(n.curr) !== 0 || Math.round(n.prev) !== 0),
+    }))
+    .filter((g) => g.notes.length > 0 || Math.round(g.curr) !== 0 || Math.round(g.prev) !== 0);
+}
+
+// "item" = שורת סעיף רגילה (קו דק), "subtotal" = סה"כ קבוצה (קו בינוני), "final" = סה"כ נכסים/התחייבויות והון (קו כפול, כמו בדוח האמיתי).
+type RowVariant = "item" | "subtotal" | "final";
+
+const ROW_BORDER: Record<RowVariant, string> = {
+  item: "1px solid #ddd",
+  subtotal: "1.5px solid #333",
+  final: "3px double #000",
+};
+
 function Row({
   label,
+  noteNum,
   curr,
   prev,
   bold,
+  variant = "item",
   showChanges,
 }: {
   label: string;
+  noteNum?: number | null;
   curr: number;
   prev: number;
   bold?: boolean;
+  variant?: RowVariant;
   showChanges: boolean;
 }) {
   return (
-    <tr style={{ borderBottom: "1px solid #ddd" }}>
+    <tr style={{ borderBottom: ROW_BORDER[variant] }}>
       <td className={`py-1.5 ${bold ? "font-bold" : ""}`}>{label}</td>
+      {noteNum !== undefined && (
+        <td className={`py-1.5 text-center ${bold ? "font-bold" : ""}`} style={{ color: "#555" }}>
+          {noteNum ?? ""}
+        </td>
+      )}
       <td className={`py-1.5 text-left tabular-nums ${bold ? "font-bold" : ""}`}>{formatAmount(curr)}</td>
       <td className={`py-1.5 text-left tabular-nums ${bold ? "font-bold" : ""}`} style={{ color: "#555" }}>
         {formatAmount(prev)}
@@ -44,26 +78,50 @@ function Row({
   );
 }
 
-function GroupRows({ group, showChanges }: { group: GroupTotal; showChanges: boolean }) {
+function GroupRows({
+  group,
+  showChanges,
+  showNoteCol,
+  colCount,
+}: {
+  group: GroupTotal;
+  showChanges: boolean;
+  showNoteCol: boolean;
+  colCount: number;
+}) {
   return (
     <>
+      <tr>
+        <td colSpan={colCount} className="pt-4 pb-1 text-base font-extrabold" style={{ borderBottom: "2px solid #333" }}>
+          {group.name}
+        </td>
+      </tr>
       {group.notes.map((n) => (
         <Row
           key={n.id}
-          label={n.num !== null ? `${n.name} (ביאור ${n.num})` : n.name}
+          label={n.name}
+          noteNum={showNoteCol ? n.num : undefined}
           curr={n.curr}
           prev={n.prev}
           showChanges={showChanges}
         />
       ))}
-      <Row label={`סה"כ ${group.name}`} curr={group.curr} prev={group.prev} bold showChanges={showChanges} />
+      <Row
+        label={`סה"כ ${group.name}`}
+        noteNum={showNoteCol ? null : undefined}
+        curr={group.curr}
+        prev={group.prev}
+        bold
+        variant="subtotal"
+        showChanges={showChanges}
+      />
     </>
   );
 }
 
 function PageHeader({ name }: { name: string }) {
   return (
-    <div className="mb-4 border-b-2 pb-2 text-xl font-extrabold" style={{ borderColor: "#999", color: "#000" }}>
+    <div className="mb-4 border-b-2 pb-2 text-center text-xl font-extrabold" style={{ borderColor: "#999", color: "#000" }}>
       {name}
     </div>
   );
@@ -162,6 +220,10 @@ export default async function PrintPage({
 
   const assetGroups = bs.groups.filter((g) => g.side === "assets");
   const liabEquityGroups = bs.groups.filter((g) => g.side === "liabilities_equity");
+  const assetGroupsPrint = hideZeroRows(assetGroups);
+  const liabEquityGroupsPrint = hideZeroRows(liabEquityGroups);
+  const currAsOfLabel = asOfLabel(currentAsOf);
+  const prevAsOfLabel = asOfLabel(prevAsOf);
   const assetsTotal = {
     curr: assetGroups.reduce((s, g) => s + g.curr, 0),
     prev: assetGroups.reduce((s, g) => s + g.prev, 0),
@@ -171,6 +233,10 @@ export default async function PrintPage({
     prev: liabEquityGroups.reduce((s, g) => s + g.prev, 0),
   };
   const liabEquityTotal = { curr: liabEquityBase.curr + pl.total.curr, prev: liabEquityBase.prev + pl.total.prev };
+
+  // מספר עמודות בפועל בכל טבלה: שם + ביאור + חובה/זכות (2) + שינוי/% אופציונלי (2) — נחוץ ל-colSpan של שורת כותרת הקבוצה.
+  const bsColCount = 4 + (showChanges ? 2 : 0);
+  const plColCount = 4 + (showChanges ? 2 : 0);
 
   const error = periodData.error;
 
@@ -215,9 +281,12 @@ export default async function PrintPage({
             <thead>
               <tr>
                 <td></td>
-                <td className="pb-2 text-left font-bold">{currLabel}</td>
+                <td className="pb-2 text-center font-bold" style={{ color: "#555" }}>
+                  ביאור
+                </td>
+                <td className="pb-2 text-left font-bold">{currAsOfLabel}</td>
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
-                  {prevLabel}
+                  {prevAsOfLabel}
                 </td>
                 {showChanges && (
                   <>
@@ -232,10 +301,18 @@ export default async function PrintPage({
               </tr>
             </thead>
             <tbody>
-              {assetGroups.map((g) => (
-                <GroupRows key={g.id} group={g} showChanges={showChanges} />
+              {assetGroupsPrint.map((g) => (
+                <GroupRows key={g.id} group={g} showChanges={showChanges} showNoteCol colCount={bsColCount} />
               ))}
-              <Row label='סה"כ נכסים' curr={assetsTotal.curr} prev={assetsTotal.prev} bold showChanges={showChanges} />
+              <Row
+                label='סה"כ נכסים'
+                noteNum={null}
+                curr={assetsTotal.curr}
+                prev={assetsTotal.prev}
+                bold
+                variant="final"
+                showChanges={showChanges}
+              />
             </tbody>
           </table>
 
@@ -243,9 +320,12 @@ export default async function PrintPage({
             <thead>
               <tr>
                 <td></td>
-                <td className="pb-2 text-left font-bold">{currLabel}</td>
+                <td className="pb-2 text-center font-bold" style={{ color: "#555" }}>
+                  ביאור
+                </td>
+                <td className="pb-2 text-left font-bold">{currAsOfLabel}</td>
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
-                  {prevLabel}
+                  {prevAsOfLabel}
                 </td>
                 {showChanges && (
                   <>
@@ -260,20 +340,23 @@ export default async function PrintPage({
               </tr>
             </thead>
             <tbody>
-              {liabEquityGroups.map((g) => (
-                <GroupRows key={g.id} group={g} showChanges={showChanges} />
+              {liabEquityGroupsPrint.map((g) => (
+                <GroupRows key={g.id} group={g} showChanges={showChanges} showNoteCol colCount={bsColCount} />
               ))}
               <Row
                 label="רווח (הפסד) לתקופה — טרם שויך לעודפים"
+                noteNum={null}
                 curr={pl.total.curr}
                 prev={pl.total.prev}
                 showChanges={showChanges}
               />
               <Row
                 label='סה"כ התחייבויות והון'
+                noteNum={null}
                 curr={liabEquityTotal.curr}
                 prev={liabEquityTotal.prev}
                 bold
+                variant="final"
                 showChanges={showChanges}
               />
             </tbody>
@@ -290,6 +373,9 @@ export default async function PrintPage({
             <thead>
               <tr>
                 <td className="pb-2 font-bold">סעיף</td>
+                <td className="pb-2 text-center font-bold" style={{ color: "#555" }}>
+                  ביאור
+                </td>
                 <td className="pb-2 text-left font-bold">{currLabel}</td>
                 <td className="pb-2 text-left font-bold" style={{ color: "#555" }}>
                   {prevLabel}
@@ -308,13 +394,15 @@ export default async function PrintPage({
             </thead>
             <tbody>
               {pl.groups.map((g) => (
-                <GroupRows key={g.id} group={g} showChanges={showChanges} />
+                <GroupRows key={g.id} group={g} showChanges={showChanges} showNoteCol colCount={plColCount} />
               ))}
               <Row
                 label="רווח (הפסד) לתקופה"
+                noteNum={null}
                 curr={pl.total.curr}
                 prev={pl.total.prev}
                 bold
+                variant="final"
                 showChanges={showChanges}
               />
             </tbody>

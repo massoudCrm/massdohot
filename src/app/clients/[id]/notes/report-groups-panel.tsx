@@ -1,9 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface ReportGroup {
   id: string;
@@ -207,6 +217,39 @@ function GroupPill({
   );
 }
 
+// עטיפה שהופכת כדור קבוצה לניתן לגרירה. הגרירה עצמה נאחזת רק דרך ידית ה-"⠿",
+// כך שכפתורי עריכה/מחיקה/חצים בתוך הכדור ממשיכים לעבוד בלחיצה רגילה בלי להתנגש עם הגרירה.
+function SortableGroupPill(props: {
+  group: ReportGroup;
+  prev: ReportGroup | null;
+  next: ReportGroup | null;
+  noteCount: number;
+  onChanged: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.group.id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1">
+      <span
+        {...attributes}
+        {...listeners}
+        title="גרור לשינוי סדר"
+        className="cursor-grab px-0.5 text-lg leading-none select-none active:cursor-grabbing"
+        style={{ color: "var(--muted)", touchAction: "none" }}
+      >
+        ⠿
+      </span>
+      <GroupPill {...props} />
+    </div>
+  );
+}
+
 function AddGroupButton({
   clientId,
   statement,
@@ -326,6 +369,75 @@ function AddGroupButton({
   );
 }
 
+function GroupsSection({
+  title,
+  list,
+  statement,
+  clientId,
+  noteCounts,
+  onChanged,
+}: {
+  title: string;
+  list: ReportGroup[];
+  statement: "bs" | "pl";
+  clientId: string;
+  noteCounts: Record<string, number>;
+  onChanged: () => void;
+}) {
+  // מצב מקומי כדי שהגרירה תראה סדר חדש מיד, ולא רק אחרי שהשרת מגיב ל-router.refresh().
+  const [items, setItems] = useState(list);
+  useEffect(() => {
+    setItems(list);
+  }, [list]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex((g) => g.id === active.id);
+    const newIndex = items.findIndex((g) => g.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(items, oldIndex, newIndex);
+    setItems(reordered);
+    const supabase = createClient();
+    await Promise.all(
+      reordered.map((g, i) => supabase.from("report_groups").update({ sort_order: i }).eq("id", g.id))
+    );
+    onChanged();
+  }
+
+  return (
+    <div>
+      <div className="text-base font-bold" style={{ color: "var(--muted)" }}>
+        {title}
+      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={items.map((g) => g.id)} strategy={horizontalListSortingStrategy}>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {items.map((g, i) => (
+              <SortableGroupPill
+                key={g.id}
+                group={g}
+                prev={items[i - 1] ?? null}
+                next={items[i + 1] ?? null}
+                noteCount={noteCounts[g.name] ?? 0}
+                onChanged={onChanged}
+              />
+            ))}
+            <AddGroupButton
+              clientId={clientId}
+              statement={statement}
+              nextSortOrder={items.length > 0 ? Math.max(...items.map((g) => g.sort_order)) + 1 : 0}
+              onAdded={onChanged}
+            />
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
+
 export function ReportGroupsPanel({
   clientId,
   groups,
@@ -345,34 +457,6 @@ export function ReportGroupsPanel({
     router.refresh();
   }
 
-  function section(title: string, list: ReportGroup[], statement: "bs" | "pl") {
-    return (
-      <div>
-        <div className="text-base font-bold" style={{ color: "var(--muted)" }}>
-          {title}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {list.map((g, i) => (
-            <GroupPill
-              key={g.id}
-              group={g}
-              prev={list[i - 1] ?? null}
-              next={list[i + 1] ?? null}
-              noteCount={noteCounts[g.name] ?? 0}
-              onChanged={refresh}
-            />
-          ))}
-          <AddGroupButton
-            clientId={clientId}
-            statement={statement}
-            nextSortOrder={list.length > 0 ? Math.max(...list.map((g) => g.sort_order)) + 1 : 0}
-            onAdded={refresh}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-[28px] border-2 p-6" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between">
@@ -383,13 +467,14 @@ export function ReportGroupsPanel({
       </button>
       {!open && (
         <div className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-          מבנה סעיפי המאזן ורווח והפסד של הלקוח הזה — סדר הקבוצות קובע גם את מספור הביאורים.
+          מבנה סעיפי המאזן ורווח והפסד של הלקוח הזה — סדר הקבוצות קובע גם את מספור הביאורים. אפשר לגרור את הכדורים
+          (⠿) כדי לשנות סדר.
         </div>
       )}
       {open && (
         <div className="mt-4 flex flex-col gap-5">
-          {section("מאזן", bs, "bs")}
-          {section("רווח והפסד", pl, "pl")}
+          <GroupsSection title="מאזן" list={bs} statement="bs" clientId={clientId} noteCounts={noteCounts} onChanged={refresh} />
+          <GroupsSection title="רווח והפסד" list={pl} statement="pl" clientId={clientId} noteCounts={noteCounts} onChanged={refresh} />
         </div>
       )}
     </div>

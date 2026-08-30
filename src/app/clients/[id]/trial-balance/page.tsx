@@ -148,7 +148,10 @@ export default async function TrialBalancePage({
 
   const totalCurr = rows.reduce((s, r) => s + r.curr, 0);
   const totalPrev = rows.reduce((s, r) => s + r.prev, 0);
-  const unassignedCount = rows.filter((r) => !r.noteId).length;
+  // חשבון ביתרת אפס בשתי התקופות לא משפיע על אף דוח, ולכן אין טעם "להציע" אותו למיון —
+  // הוא לא נספר לא כחסר וגם לא כמוין, כדי שבדיקת המיון תשקף רק את מה שבאמת חשוב לסווג.
+  const meaningfulRows = rows.filter((r) => Math.round(r.curr) !== 0 || Math.round(r.prev) !== 0);
+  const unassignedCount = meaningfulRows.filter((r) => !r.noteId).length;
 
   return (
     <>
@@ -211,8 +214,8 @@ export default async function TrialBalancePage({
             </div>
             <div className="mt-1.5 text-base leading-relaxed">
               {unassignedCount === 0
-                ? `כל ${rows.length.toLocaleString("he-IL")} הסעיפים שויכו לביאור.`
-                : `${unassignedCount.toLocaleString("he-IL")} סעיפים אינם מוינים. הם לא ייכללו בדוחות עד שישויכו לביאור.`}
+                ? `כל ${meaningfulRows.length.toLocaleString("he-IL")} הסעיפים בעלי יתרה שויכו לביאור.`
+                : `${unassignedCount.toLocaleString("he-IL")} סעיפים בעלי יתרה אינם מוינים. הם לא ייכללו בדוחות עד שישויכו לביאור. (חשבונות ביתרת אפס לא נספרים כאן — אין צורך למיין אותם.)`}
             </div>
           </div>
         )}
