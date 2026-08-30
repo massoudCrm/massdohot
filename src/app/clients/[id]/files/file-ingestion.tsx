@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { parseUniformFormat, type ParseResult } from "@/lib/uniform-format/parse";
+import { parseUniformFormat, type ParseResult, type ParsedAccount } from "@/lib/uniform-format/parse";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { describeError, formatAmount } from "@/lib/format";
 
@@ -18,6 +18,54 @@ export interface YearStatus {
 }
 
 const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => 2024 + i); // 2024–2032
+
+// בדיקה חד-פעמית: האם שדה "קוד סיווג" (1417) שקיים במפרט הקובץ האחיד באמת נושא מידע
+// שימושי (למשל זיהוי מאזני/תוצאתי) בקבצים האמיתיים שלך. מציג את הערכים שנמצאו בפועל
+// ודוגמת חשבון לכל ערך, כדי שנוכל להחליט יחד אם אפשר להסתמך עליו — לא נעשה בו כרגע
+// שום שימוש אוטומטי.
+function ClassificationCodeDiagnostics({ accounts }: { accounts: ParsedAccount[] }) {
+  if (accounts.length === 0) return null;
+  const byCode = new Map<string, { count: number; example: ParsedAccount }>();
+  for (const a of accounts) {
+    const key = a.classificationCode || "(ריק)";
+    const existing = byCode.get(key);
+    if (existing) existing.count += 1;
+    else byCode.set(key, { count: 1, example: a });
+  }
+  const rows = [...byCode.entries()].sort((a, b) => b[1].count - a[1].count);
+
+  return (
+    <div
+      className="mt-3 rounded-2xl border-2 p-4 text-base"
+      style={{ borderColor: "var(--border)", background: "var(--background)" }}
+    >
+      <b>בדיקה: שדה &quot;קוד סיווג&quot; (1417) בקובץ</b>
+      <div className="mt-1" style={{ color: "var(--muted)" }}>
+        זו רק תצוגת מידע לבדיקה — לא משפיע על הקליטה. הערכים שנמצאו בפועל בקובץ הזה, ודוגמת חשבון לכל ערך:
+      </div>
+      <table className="mt-3 w-full border-collapse text-sm">
+        <thead>
+          <tr style={{ color: "var(--muted)" }}>
+            <td className="pb-1 pl-4">ערך</td>
+            <td className="pb-1 pl-4">כמות חשבונות</td>
+            <td className="pb-1">דוגמה</td>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([code, { count, example }]) => (
+            <tr key={code} style={{ borderTop: "1px solid var(--border-soft)" }}>
+              <td className="py-1 pl-4 font-mono">{code}</td>
+              <td className="py-1 pl-4">{count.toLocaleString("he-IL")}</td>
+              <td className="py-1">
+                {example.code} · {example.name}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function DropZone({
   label,
@@ -330,6 +378,8 @@ export function FileIngestion({
                 נמצאו <b>{result.accounts.length}</b> חשבונות ו-<b>{result.transactions.length}</b> תנועות עבור{" "}
                 <b>{result.businessName}</b> (ח.פ {result.vatId}).
               </div>
+
+              <ClassificationCodeDiagnostics accounts={result.accounts} />
 
               <div
                 className="mt-3 rounded-2xl border-2 p-4 text-base"

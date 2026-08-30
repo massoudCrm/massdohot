@@ -15,6 +15,10 @@ export interface ParsedAccount {
   openingBalance: number; // חתום: חיובי = יתרת חובה, שלילי = יתרת זכות (שדה 1414)
   sourceGroupCode: string; // "קוד מאזן בוחן" מהקובץ (שדה 1405) — קיבוץ שכבר קיים בתוכנת ההנה"ח
   sourceGroupDesc: string; // "תיאור קוד מאזן בוחן" (שדה 1406)
+  // "קוד סיווג" (שדה 1417) — קיים במפרט הרשמי אבל עד כה לא נעשה בו שימוש. חשוף כרגע רק
+  // לבדיקה: האם השדה הזה בפועל מכיל מידע שיכול לשמש לזיהוי חשבון מאזני/תוצאתי מהקובץ עצמו,
+  // בלי לנחש. אין עדיין שום החלטה אוטומטית שמתבססת עליו.
+  classificationCode: string;
 }
 
 export interface ParsedTransaction {
@@ -123,6 +127,7 @@ export function parseUniformFormat(
         openingBalance: parseSignedAmount(rec.openingBalance),
         sourceGroupCode: trimAlpha(rec.trialBalanceCode),
         sourceGroupDesc: trimAlpha(rec.trialBalanceCodeDesc),
+        classificationCode: trimAlpha(rec.classificationCode),
       });
     } else if (code === "B100") {
       const rec = sliceFields(line, B100_FIELDS);

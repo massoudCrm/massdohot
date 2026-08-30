@@ -169,14 +169,18 @@ function NoteSection({
           {note.subNotes.map((sn) => (
             <Row key={sn.id} label={sn.name} curr={sn.curr} prev={sn.prev} showChanges={showChanges} />
           ))}
-          {note.subNotes.length > 0 && (
-            <Row
-              label="יתרת כרטיסים ללא תת-ביאור"
-              curr={note.direct.curr}
-              prev={note.direct.prev}
-              showChanges={showChanges}
-            />
-          )}
+          {note.statement === "pl"
+            ? note.directAccounts.map((a) => (
+                <Row key={a.id} label={a.name} curr={a.curr} prev={a.prev} showChanges={showChanges} />
+              ))
+            : note.subNotes.length > 0 && (
+                <Row
+                  label="יתרת כרטיסים ללא תת-ביאור"
+                  curr={note.direct.curr}
+                  prev={note.direct.prev}
+                  showChanges={showChanges}
+                />
+              )}
           <Row label='סה"כ' curr={note.curr} prev={note.prev} bold showChanges={showChanges} />
         </tbody>
       </table>

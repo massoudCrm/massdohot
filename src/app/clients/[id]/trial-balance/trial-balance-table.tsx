@@ -15,6 +15,9 @@ export interface TbRow {
   sourceGroupDesc: string | null;
   curr: number;
   prev: number;
+  // true כשאין שיוך ביאור וגם קוד המיון של החשבון עדיין לא סווג מאזני/תוצאתי — ראו
+  // "סיווג קודי מיון" ב-source-group-classification-panel.tsx. לא ניחוש: מסומן לתשומת לב.
+  unclassified: boolean;
 }
 
 export interface SubNoteOption {
@@ -446,7 +449,13 @@ export function TrialBalanceTable({
                   key={r.accountId}
                   style={{
                     borderBottom: "1.5px solid var(--border-soft)",
-                    background: !noteId ? "#fff2eb" : selected.has(r.accountId) ? "var(--success-soft)" : "transparent",
+                    background: r.unclassified
+                      ? "#ffe3e3"
+                      : !noteId
+                      ? "#fff2eb"
+                      : selected.has(r.accountId)
+                      ? "var(--success-soft)"
+                      : "transparent",
                   }}
                 >
                   <td className="p-3">

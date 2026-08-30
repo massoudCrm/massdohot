@@ -5,6 +5,7 @@ import { firstDayOfMonth, lastDayOfMonth } from "@/lib/format";
 import { PeriodSelector } from "./period-selector";
 import { TrialBalanceTable, type TbRow } from "./trial-balance-table";
 import { SortRulesPanel, type SortRule } from "./sort-rules-panel";
+import { SourceGroupClassificationPanel, type SourceGroupClassification } from "./source-group-classification-panel";
 import { fetchPlActivity, orderNotesAndNumber } from "../report-shared";
 
 const MONTH_NAMES = [
@@ -84,6 +85,7 @@ export default async function TrialBalancePage({
     { data: groupsRaw },
     { rows: plCurrRows, error: plCurrErr },
     { rows: plPrevRows, error: plPrevErr },
+    { data: classificationsRaw },
   ] = await Promise.all([
     fetchAccountBalances(supabase, id, currentAsOf),
     fetchAccountBalances(supabase, id, prevAsOf),
@@ -101,6 +103,11 @@ export default async function TrialBalancePage({
     supabase.from("report_groups").select("name, statement").eq("client_id", id).order("statement").order("sort_order"),
     fetchPlActivity(supabase, id, currentPeriod),
     fetchPlActivity(supabase, id, prevPeriod),
+    supabase
+      .from("source_group_classifications")
+      .select("id, source_group_code, source_group_desc, statement")
+      .eq("client_id", id)
+      .order("source_group_code"),
   ]);
 
   // חשבונות רווח והפסד לא מוצגים כיתרה מצטברת-מאז-ומעולם (כמו מאזן) אלא כתנועת התקופה
@@ -111,6 +118,12 @@ export default async function TrialBalancePage({
   const plNoteIds = new Set((notesRaw ?? []).filter((n) => plGroupNames.has(n.group)).map((n) => n.id));
   const plCurrByAccount = new Map(plCurrRows.map((r) => [r.account_id, r.balance]));
   const plPrevByAccount = new Map(plPrevRows.map((r) => [r.account_id, r.balance]));
+
+  // חשבון שעדיין לא שויך לביאור לא יכול לדעת אם הוא מאזני/תוצאתי מהשיוך — אבל קוד המיון
+  // שלו (מהקובץ) כבר מסווג פעם אחת ללקוח דרך "source_group_classifications" (ראו הפאנל
+  // "סיווג קודי מיון"), כך שגם חשבון לא-מסווג מחושב נכון כבר מהקליטה, לא רק אחרי מיון ידני.
+  const classifications = ((classificationsRaw ?? []) as { id: string; source_group_code: string; source_group_desc: string | null; statement: "bs" | "pl" | null }[]);
+  const statementByGroupCode = new Map(classifications.map((c) => [c.source_group_code, c.statement]));
 
   const prevByAccount = new Map<string, number>(
     prevBalances.map((r) => [r.account_id, r.balance])
@@ -132,7 +145,11 @@ export default async function TrialBalancePage({
   }));
 
   const rows: TbRow[] = currentBalances.map((r) => {
-    const isPl = r.note_id !== null && plNoteIds.has(r.note_id);
+    const groupStatement = r.source_group_code ? statementByGroupCode.get(r.source_group_code) : undefined;
+    const isPl = r.note_id !== null ? plNoteIds.has(r.note_id) : groupStatement === "pl";
+    // "לא מסווג" רק כשאין שיוך ביאור (שהיה נותן תשובה ודאית) וגם אין תשובה מקוד המיון —
+    // לא ניחוש: אם אין תשובה, מחושב כברירת מחדל מאזנית (כמו היום) והשורה מסומנת לתשומת לב.
+    const unclassified = r.note_id === null && (groupStatement === undefined || groupStatement === null);
     return {
       accountId: r.account_id,
       code: r.code,
@@ -143,6 +160,7 @@ export default async function TrialBalancePage({
       sourceGroupDesc: r.source_group_desc,
       curr: isPl ? plCurrByAccount.get(r.account_id) ?? 0 : r.balance,
       prev: isPl ? plPrevByAccount.get(r.account_id) ?? 0 : prevByAccount.get(r.account_id) ?? 0,
+      unclassified,
     };
   });
 
@@ -152,6 +170,19 @@ export default async function TrialBalancePage({
   // הוא לא נספר לא כחסר וגם לא כמוין, כדי שבדיקת המיון תשקף רק את מה שבאמת חשוב לסווג.
   const meaningfulRows = rows.filter((r) => Math.round(r.curr) !== 0 || Math.round(r.prev) !== 0);
   const unassignedCount = meaningfulRows.filter((r) => !r.noteId).length;
+  const unclassifiedCount = meaningfulRows.filter((r) => r.unclassified).length;
+
+  // כדי שאפשר יהיה להחליט מאזני/תוצאתי בלי לעבור למסך מאזן הבוחן, מציגים ליד כל קוד
+  // מיון בפאנל הסיווג גם כמה כרטיסים יש בו וכמה היתרה הכוללת שלהם בשתי התקופות.
+  const summaryByGroupCode = new Map<string, { count: number; curr: number; prev: number }>();
+  for (const r of rows) {
+    if (!r.sourceGroupCode) continue;
+    const s = summaryByGroupCode.get(r.sourceGroupCode) ?? { count: 0, curr: 0, prev: 0 };
+    s.count += 1;
+    s.curr += r.curr;
+    s.prev += r.prev;
+    summaryByGroupCode.set(r.sourceGroupCode, s);
+  }
 
   return (
     <>
@@ -220,6 +251,20 @@ export default async function TrialBalancePage({
           </div>
         )}
 
+        {unclassifiedCount > 0 && (
+          <div
+            className="mb-6 rounded-[28px] border-2 p-6"
+            style={{ borderColor: "#e57373", background: "#ffe3e3", color: "#7a1f1f" }}
+          >
+            <div className="text-xl font-extrabold">קוד מיון לא מסווג</div>
+            <div className="mt-1.5 text-base leading-relaxed">
+              {unclassifiedCount.toLocaleString("he-IL")} סעיפים בעלי יתרה שייכים לקוד מיון שעדיין לא נקבע לגביו אם
+              הוא מאזני או תוצאתי (מסומנים באדום בטבלה למטה) — עד שתקבע זאת בפאנל &quot;סיווג קודי מיון&quot;, הם
+              מחושבים כמאזניים כברירת מחדל, וזה עלול להיות שגוי אם הם בעצם רווח והפסד.
+            </div>
+          </div>
+        )}
+
         {rows.length > 0 && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <TrialBalanceTable
@@ -231,12 +276,24 @@ export default async function TrialBalancePage({
               totalCurr={totalCurr}
               totalPrev={totalPrev}
             />
-            <SortRulesPanel
-              clientId={id}
-              rules={(sortRules as SortRule[]) ?? []}
-              notes={noteOptions}
-              sourceGroups={(sourceGroups as { code: string; desc: string; count: number }[]) ?? []}
-            />
+            <div className="flex flex-col gap-6">
+              <SourceGroupClassificationPanel
+                clientId={id}
+                classifications={classifications.map((c): SourceGroupClassification => ({
+                  id: c.id,
+                  sourceGroupCode: c.source_group_code,
+                  sourceGroupDesc: c.source_group_desc,
+                  statement: c.statement,
+                }))}
+                summaryByGroupCode={Object.fromEntries(summaryByGroupCode)}
+              />
+              <SortRulesPanel
+                clientId={id}
+                rules={(sortRules as SortRule[]) ?? []}
+                notes={noteOptions}
+                sourceGroups={(sourceGroups as { code: string; desc: string; count: number }[]) ?? []}
+              />
+            </div>
           </div>
         )}
       </main>

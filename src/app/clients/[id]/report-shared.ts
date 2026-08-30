@@ -27,6 +27,9 @@ interface BalanceRow {
   note_id: string | null;
   sub_note_id: string | null;
   balance: number;
+  // רק pl_period_activity מחזירה שם חשבון — נחוץ כדי להציג כל חשבון רו"ה שמשויך ישירות
+  // לביאור (בלי תת-ביאור) כשורה נפרדת משלו, ראו buildNoteDetails למטה.
+  name?: string;
 }
 
 interface SubNoteRow {
@@ -61,6 +64,10 @@ export interface NoteDetail {
   prev: number;
   direct: { curr: number; prev: number };
   subNotes: { id: string; name: string; curr: number; prev: number }[];
+  // חשבונות רו"ה שמשויכים ישירות לביאור (בלי תת-ביאור), כל אחד בשורה נפרדת משלו לפי שמו
+  // בכרטסת — לא צריך תת-ביאור בשביל זה. ריק תמיד לביאורי מאזן (שם ה"direct" הכולל מספיק,
+  // כי חשבון מאזני בדרך כלל מרכיב יתרה משותפת ולא שורה עצמאית משמעותית — ראו השיחה איתו).
+  directAccounts: { id: string; name: string; curr: number; prev: number }[];
 }
 
 // account_balances_as_of מחזירה מערך JSON יחיד בתוך שורה בודדת (לא טבלת שורות), כדי לעקוף
@@ -268,6 +275,36 @@ export function buildReportData(
   return { groups, total };
 }
 
+// לביאור רו"ה: כל חשבון שמשויך ישירות לביאור (בלי תת-ביאור) בשורה נפרדת משלו, לפי השם
+// שכבר יש לו בכרטסת — אין צורך ביצירת תת-ביאור בשביל זה (בניגוד לביאורי מאזן, שם חשבונות
+// ישירים מסתכמים יחד ל-"direct" אחד, כי הם בדרך כלל מרכיבים יתרה משותפת לא-משמעותית לבד).
+function directAccountRows(
+  currRows: BalanceRow[],
+  prevRows: BalanceRow[],
+  noteId: string,
+  shouldFlip: boolean
+): { id: string; name: string; curr: number; prev: number }[] {
+  const isDirect = (r: BalanceRow) => r.note_id === noteId && !r.sub_note_id;
+  const currByAccount = new Map(currRows.filter(isDirect).map((r) => [r.account_id, r]));
+  const prevByAccount = new Map(prevRows.filter(isDirect).map((r) => [r.account_id, r]));
+  const accountIds = new Set([...currByAccount.keys(), ...prevByAccount.keys()]);
+
+  return [...accountIds]
+    .map((accountId) => {
+      const curr = currByAccount.get(accountId);
+      const prev = prevByAccount.get(accountId);
+      const rawCurr = curr?.balance ?? 0;
+      const rawPrev = prev?.balance ?? 0;
+      return {
+        id: accountId,
+        name: curr?.name ?? prev?.name ?? accountId,
+        curr: shouldFlip ? -rawCurr : rawCurr,
+        prev: shouldFlip ? -rawPrev : rawPrev,
+      };
+    })
+    .filter((a) => Math.round(a.curr) !== 0 || Math.round(a.prev) !== 0);
+}
+
 // פירוט מלא של כל ביאור (משני הדוחות יחד, במספור אחיד) לצורך תצוגת הדפסה: סכום כולל,
 // ופילוח לפי תת-ביאור (אם יש) + יתרת החשבונות המשויכים ישירות לביאור בלי תת-ביאור.
 // ביאורי מאזן משתמשים ביתרה מצטברת, ביאורי רו"ה בתנועת התקופה — ראו buildReportData למעלה.
@@ -310,6 +347,8 @@ export function buildNoteDetails(data: PeriodData): NoteDetail[] {
       curr: shouldFlip ? -directRawCurr : directRawCurr,
       prev: shouldFlip ? -directRawPrev : directRawPrev,
     };
+    const directAccounts =
+      statement === "pl" ? directAccountRows(data.plCurr, data.plPrev, n.id, shouldFlip) : [];
 
     return {
       id: n.id,
@@ -319,6 +358,7 @@ export function buildNoteDetails(data: PeriodData): NoteDetail[] {
       curr: direct.curr + subDetails.reduce((s, d) => s + d.curr, 0),
       prev: direct.prev + subDetails.reduce((s, d) => s + d.prev, 0),
       direct,
+      directAccounts,
       subNotes: subDetails,
     };
   });

@@ -4,6 +4,47 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+// מחיל אוטומטית על לקוח חדש את תבנית ברירת המחדל (סעיפים + קבוצות דוח), אם הוגדרה כזו —
+// כדי שלא תצטרך ללחוץ "טען תבנית מחדל" ידנית בכל פעם (קבוצות הדוח כבר נזרעות אוטומטית
+// דרך טריגר במסד הנתונים; זה משלים את זה גם לשמות הסעיפים בפועל). כישלון שקט: אם אין
+// תבנית ברירת מחדל מוגדרת, הלקוח פשוט נשאר ריק כמו היום, בלי הודעת שגיאה מטרידה.
+async function applyDefaultTemplate(clientId: string) {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("note_templates")
+    .select("notes_snapshot, groups_snapshot, general_note")
+    .eq("is_default", true)
+    .maybeSingle();
+  if (!data) return;
+
+  const notesSnapshot = (data.notes_snapshot as { name: string; group: string; has_note: boolean }[]) ?? [];
+  const groupsSnapshot =
+    (data.groups_snapshot as
+      | { statement: "bs" | "pl"; side: "assets" | "liabilities_equity" | null; name: string; sort_order: number }[]
+      | null) ?? [];
+
+  if (groupsSnapshot.length > 0) {
+    await supabase.from("report_groups").delete().eq("client_id", clientId);
+    await supabase.from("report_groups").insert(
+      groupsSnapshot.map((g) => ({
+        client_id: clientId,
+        statement: g.statement,
+        side: g.side,
+        name: g.name,
+        sort_order: g.sort_order,
+      }))
+    );
+  }
+  if (notesSnapshot.length > 0) {
+    await supabase
+      .from("notes")
+      .insert(notesSnapshot.map((n) => ({ client_id: clientId, name: n.name, group: n.group, has_note: n.has_note })));
+  }
+  if (data.general_note) {
+    await supabase.from("clients").update({ general_note: data.general_note }).eq("id", clientId);
+  }
+}
+
 export function NewClientForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -19,16 +60,22 @@ export function NewClientForm() {
     setSaving(true);
 
     const supabase = createClient();
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from("clients")
-      .insert({ name, tax_id: taxId, kind });
-
-    setSaving(false);
+      .insert({ name, tax_id: taxId, kind })
+      .select("id")
+      .single();
 
     if (insertError) {
+      setSaving(false);
       setError("שמירה נכשלה: " + insertError.message);
       return;
     }
+
+    if (inserted) {
+      await applyDefaultTemplate(inserted.id);
+    }
+    setSaving(false);
 
     setName("");
     setTaxId("");
